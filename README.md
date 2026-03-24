@@ -180,6 +180,6 @@ You don't need to read this section to use the tool — everything above is all 
 **Don't use `sudo` (Mac) or "Run as Administrator" (Windows).** It's not needed and can cause problems.
 
 **Project links:**
-- **Our version (what this script installs):** [github.com/ehawkin/zotero-mcp](https://github.com/ehawkin/zotero-mcp)
-- **Original project:** [github.com/54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp)
-- Our additions have been submitted back to the original project ([PR #165](https://github.com/54yyyu/zotero-mcp/pull/165)). Once merged upstream, the script will be updated to install from the official repo.
+- **Zotero MCP project:** [github.com/54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp)
+- **This setup guide and scripts:** [github.com/ehawkin/zotero-mcp-setup](https://github.com/ehawkin/zotero-mcp-setup)
+- We contributed significantly to the Zotero MCP project — our additions include 11 new tools, 20+ bug fixes, and 339 automated tests (PRs [#165](https://github.com/54yyyu/zotero-mcp/pull/165), [#170](https://github.com/54yyyu/zotero-mcp/pull/170), [#174](https://github.com/54yyyu/zotero-mcp/pull/174)).
