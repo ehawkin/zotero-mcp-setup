@@ -6,12 +6,15 @@
 
 Use Claude to manage and interact with your entire Zotero library — search papers, add references, manage collections, read full texts, and more. To set it up:
 
-1. Install [Zotero 8](https://www.zotero.org/download/) and [Claude Desktop](https://claude.ai/download)
-2. In Zotero: **Settings > General** > check **"Allow other applications to communicate with Zotero"**
-3. Run the install script:
+1. Download the install script for your system:
+   - **Mac:** [install-zotero-mcp.sh](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.sh) (right-click > "Save Link As..." to download)
+   - **Windows:** [install-zotero-mcp.ps1](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.ps1) (right-click > "Save Link As..." to download)
+2. Install [Zotero 8](https://www.zotero.org/download/) and [Claude Desktop](https://claude.ai/download) if you don't have them already
+3. In Zotero: **Settings > General** > check **"Allow other applications to communicate with Zotero"**
+4. Run the install script:
    - **Mac:** Open Terminal and run `bash ~/Downloads/install-zotero-mcp.sh`
-   - **Windows:** Right-click `install-zotero-mcp.ps1` > "Run with PowerShell"
-4. The script walks you through everything else. When it's done, restart Claude Desktop and start chatting.
+   - **Windows:** Right-click the downloaded file > "Run with PowerShell"
+5. The script walks you through everything else. When it's done, restart Claude Desktop and start chatting.
 
 ---
 
@@ -31,9 +34,9 @@ Make sure you have these three things installed:
 
 1. **Zotero 8 or later** — the desktop app, downloaded from [zotero.org/download](https://www.zotero.org/download/). You need version 8 or newer — older versions are missing features this tool depends on.
 2. **Claude Desktop** — the desktop app (not the website), downloaded from [claude.ai/download](https://claude.ai/download)
-3. **The install script** — the script that you received with this guide:
-   - **Mac:** `install-zotero-mcp.sh`
-   - **Windows:** `install-zotero-mcp.ps1`
+3. **The install script** — download it here if you don't already have it:
+   - **Mac:** [install-zotero-mcp.sh](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.sh) (right-click > "Save Link As...")
+   - **Windows:** [install-zotero-mcp.ps1](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.ps1) (right-click > "Save Link As...")
 
 You'll also need to turn on one setting in Zotero:
 - **Mac:** Open Zotero > **Settings > General** > check **"Allow other applications to communicate with Zotero"**
