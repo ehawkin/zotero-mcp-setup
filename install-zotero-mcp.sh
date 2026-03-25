@@ -422,7 +422,6 @@ except: pass
     fi
 
     if [[ -z "$ZOTERO_API_KEY" ]]; then
-    else
         warn "Skipping API key setup."
         ENABLE_WRITE_SUPPORT=""
         if [[ "$ACCESS_MODE" == "web" ]]; then
