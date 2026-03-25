@@ -185,7 +185,8 @@ if ($SetupMode -eq "2") {
         Write-Host "  By default, it uses a small local AI model that runs on your"
         Write-Host "  computer - no tokens or usage limits are consumed."
         Write-Host ""
-        $semReply = Read-Host "  Enable semantic search? (Y/n) <- recommended"
+        Write-Host "  Recommended: Yes"
+        $semReply = Read-Host "  Enable semantic search? (Y/n)"
         if ($semReply -match "^[Nn]") {
             $EnableSemantic = $false
             $BuildDb = $false
@@ -227,7 +228,8 @@ if ($SetupMode -eq "2") {
     # Build timing
     if ($EnableSemantic) {
         Write-Host ""
-        $buildReply = Read-Host "  Build semantic search database now? (Y/n) <- recommended"
+        Write-Host "  Recommended: Yes"
+        $buildReply = Read-Host "  Build semantic search database now? (Y/n)"
         if ($buildReply -match "^[Nn]") {
             $BuildDb = $false
             Info "You can build it later by re-running this script."
@@ -459,7 +461,8 @@ if ($BuildDb) {
         Write-Host "  new papers, which may improve search quality."
         Write-Host "  This takes 5-15 minutes."
         Write-Host ""
-        $rebuildReply = Read-Host "  Rebuild now? (Y/n) <- recommended"
+        Write-Host "  Recommended: Yes"
+        $rebuildReply = Read-Host "  Rebuild now? (Y/n)"
         if ($rebuildReply -match "^[Nn]") {
             Info "Keeping existing database."
             Write-Host "   To rebuild later, re-run this script or run:"

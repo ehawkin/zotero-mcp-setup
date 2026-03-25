@@ -241,7 +241,8 @@ if [[ "$SETUP_MODE" == "2" ]]; then
         echo "  By default, it uses a small local AI model that runs on your"
         echo "  computer — no tokens or usage limits are consumed."
         echo ""
-        read -p "  Enable semantic search? (Y/n) ← recommended  " -n 1 -r
+        echo "  Recommended: Yes"
+        read -p "  Enable semantic search? (Y/n): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             ENABLE_SEMANTIC_SEARCH="no"
@@ -293,7 +294,8 @@ if [[ "$SETUP_MODE" == "2" ]]; then
         echo "  Would you like to build the semantic search database now?"
         echo "  This is a one-time process that takes 5-15 minutes."
         echo ""
-        read -p "  Build now? (Y/n) ← recommended  " -n 1 -r
+        echo "  Recommended: Yes"
+        read -p "  Build now? (Y/n): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             BUILD_SEMANTIC_DB="no"
@@ -591,7 +593,8 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
         echo "  new papers, which may improve search quality."
         echo "  This takes 5-15 minutes."
         echo ""
-        read -p "  Rebuild now? (Y/n) ← recommended  " -n 1 -r
+        echo "  Recommended: Yes"
+        read -p "  Rebuild now? (Y/n): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             info "Keeping existing database."
@@ -662,40 +665,37 @@ fi
 # ============================================================================
 
 echo ""
-echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║${GREEN}              ✓ Installation Complete!                    ${NC}${BOLD}║${NC}"
-echo -e "${BOLD}╠══════════════════════════════════════════════════════════╣${NC}"
-echo -e "${BOLD}║${NC}                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  To start using Zotero MCP:                              ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  1. Make sure Zotero is running                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  2. Open Claude Desktop (restart if already open)        ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  3. Start chatting! Try:                                 ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}     \"What papers are in my library about [topic]?\"       ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>${NC}    ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>> ${BOLD}IMPORTANT: In Zotero, go to:${NC}                    ${RED}<<<${NC}  ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>>   Settings > Advanced${NC}                            ${RED}<<<${NC}  ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>> ${BOLD}and make sure this is CHECKED:${NC}                  ${RED}<<<${NC}  ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>>   ☑ Allow other applications on this computer${NC} ${RED}<<<${NC}  ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>>     to communicate with Zotero${NC}                  ${RED}<<<${NC}  ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>> ${BOLD}Without this, the MCP cannot connect!${NC}           ${RED}<<<${NC}  ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>${NC}    ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "  ${GREEN}✓ Installation Complete!${NC}"
+echo ""
+echo "  To start using Zotero MCP:"
+echo ""
+echo "  1. Make sure Zotero is running"
+echo "  2. Open Claude Desktop (restart if already open)"
+echo "  3. Start chatting! Try:"
+echo "     \"What papers are in my library about [topic]?\""
+echo ""
+echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "  ${RED}${BOLD}IMPORTANT:${NC} In Zotero, go to:"
+echo "    Settings > Advanced"
+echo -e "  and make sure this is ${BOLD}CHECKED${NC}:"
+echo -e "    ${BLUE}☑ Allow other applications on this computer${NC}"
+echo -e "    ${BLUE}  to communicate with Zotero${NC}"
+echo -e "  ${RED}${BOLD}Without this, the MCP cannot connect!${NC}"
+echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 # Show setup summary
 if [[ -n "$ENABLE_WRITE_SUPPORT" ]] && [[ -n "$ZOTERO_API_KEY" ]]; then
-    echo "  Your setup: ${GREEN}Hybrid mode (read + write)${NC}"
+    echo -e "  Your setup: ${GREEN}Hybrid mode (read + write)${NC}"
     echo ""
     echo "  Claude can search, add papers by DOI, manage collections,"
     echo "  tag items, create notes, find duplicates, and more."
 elif [[ "$ACCESS_MODE" == "web" ]]; then
-    echo "  Your setup: ${YELLOW}Web API mode${NC}"
+    echo -e "  Your setup: ${YELLOW}Web API mode${NC}"
     echo "  Re-run this script to switch to hybrid mode."
 else
-    echo "  Your setup: ${YELLOW}Local-only mode (read access)${NC}"
+    echo -e "  Your setup: ${YELLOW}Local-only mode (read access)${NC}"
     echo "  Re-run this script to add write support."
 fi
 
