@@ -322,45 +322,106 @@ fi  # end advanced mode
 if [[ "$ACCESS_MODE" == "hybrid" ]] || [[ "$ACCESS_MODE" == "web" ]]; then
     ENABLE_WRITE_SUPPORT="true"
 
-    echo ""
-    echo "  To enable write operations (adding papers, managing collections,"
-    echo "  updating metadata), you'll need a Zotero API key."
-    echo ""
-    echo "  Note: You'll need to be logged in to Zotero on the web."
-    echo "  If you haven't verified your email with Zotero yet, you"
-    echo "  may need to do that first."
-    echo ""
-    echo "  1. Go to: https://www.zotero.org/settings/keys"
-    echo "     (If that link doesn't work, go to zotero.org, log in,"
-    echo "      then navigate to Settings > Feeds/API)"
-    echo "  2. Click \"Create new private key\""
-    echo "  3. Give it a name (e.g., \"Claude MCP\")"
-    echo "  4. Under \"Personal Library\", check ALL of these:"
-    echo "       ☐ Allow library access"
-    echo "       ☐ Allow write access"
-    echo "       ☐ Allow notes access"
-    echo "  5. Click \"Save Key\" and copy the key shown"
-    echo ""
-    read -p "  Enter your Zotero API Key (or press Enter to skip): " ZOTERO_API_KEY
-    echo ""
+    # Check for existing credentials in Claude Desktop config
+    EXISTING_API_KEY=""
+    EXISTING_LIBRARY_ID=""
+    if [[ -f "$CLAUDE_CONFIG_FILE" ]]; then
+        EXISTING_API_KEY=$(python3 -c "
+import json
+try:
+    with open('$CLAUDE_CONFIG_FILE') as f:
+        c = json.load(f)
+    print(c.get('mcpServers',{}).get('zotero',{}).get('env',{}).get('ZOTERO_API_KEY',''))
+except: pass
+" 2>/dev/null)
+        EXISTING_LIBRARY_ID=$(python3 -c "
+import json
+try:
+    with open('$CLAUDE_CONFIG_FILE') as f:
+        c = json.load(f)
+    print(c.get('mcpServers',{}).get('zotero',{}).get('env',{}).get('ZOTERO_LIBRARY_ID',''))
+except: pass
+" 2>/dev/null)
+    fi
 
-    if [[ -n "$ZOTERO_API_KEY" ]]; then
-        echo ""
-        echo "  Now we need your Zotero User ID."
-        echo "  Go back to: https://www.zotero.org/settings/keys"
-        echo "  Your User ID is the number labeled \"Your userID for"
-        echo "  use in API calls\" — it's NOT your username."
-        echo ""
-        read -p "  Enter your Zotero User ID: " ZOTERO_LIBRARY_ID
-        echo ""
+    section "Setting up Zotero API Access"
 
-        if [[ -n "$ZOTERO_LIBRARY_ID" ]]; then
-            success "API credentials captured"
-            pause 0.3        else
-            warn "No User ID provided. Configuring local-only mode."
-            ENABLE_WRITE_SUPPORT=""
-            ZOTERO_API_KEY=""
+    if [[ -n "$EXISTING_API_KEY" ]] && [[ -n "$EXISTING_LIBRARY_ID" ]]; then
+        # Show existing credentials and offer to keep them
+        MASKED_KEY="${EXISTING_API_KEY:0:4}***${EXISTING_API_KEY: -4}"
+        echo "  Existing credentials found in your config:"
+        echo ""
+        echo "    API Key:  $MASKED_KEY"
+        echo "    User ID:  $EXISTING_LIBRARY_ID"
+        echo ""
+        echo "  Recommended: Keep existing"
+        read -p "  Keep these credentials? (Y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            ZOTERO_API_KEY="$EXISTING_API_KEY"
+            ZOTERO_LIBRARY_ID="$EXISTING_LIBRARY_ID"
+            success "Using existing API credentials"
+            pause 0.3
+        else
+            echo ""
+            echo "  Enter new credentials below."
+            EXISTING_API_KEY=""  # Clear so we fall through to the manual entry
         fi
+    fi
+
+    # Manual entry (if no existing credentials or user chose to replace)
+    if [[ -z "$ZOTERO_API_KEY" ]]; then
+        echo ""
+        echo "  To enable write operations (adding papers, managing collections,"
+        echo "  updating metadata), you'll need a Zotero API key."
+        echo ""
+        echo "  Note: You'll need to be logged in to Zotero on the web."
+        echo "  If you haven't verified your email with Zotero yet, you"
+        echo "  may need to do that first."
+        echo ""
+        echo "  1. Go to this URL:"
+        echo ""
+        echo "     https://www.zotero.org/settings/keys"
+        echo ""
+        echo "     (If that link doesn't work, go to zotero.org, log in,"
+        echo "      then navigate to Settings > Feeds/API)"
+        echo "  2. Click \"Create new private key\""
+        echo "  3. Give it a name (e.g., \"Claude MCP\")"
+        echo "  4. Under \"Personal Library\", check ALL of these:"
+        echo "       ☐ Allow library access"
+        echo "       ☐ Allow write access"
+        echo "       ☐ Allow notes access"
+        echo "  5. Click \"Save Key\" and copy the key shown"
+        echo ""
+        read -p "  Enter your Zotero API Key (or press Enter to skip): " ZOTERO_API_KEY
+        echo ""
+
+        if [[ -n "$ZOTERO_API_KEY" ]]; then
+            echo ""
+            echo "  Now we need your Zotero User ID."
+            echo ""
+            echo "  Go back to this URL:"
+            echo ""
+            echo "     https://www.zotero.org/settings/keys"
+            echo ""
+            echo "  Your User ID is the number labeled \"Your userID for"
+            echo "  use in API calls\" — it's NOT your username."
+            echo ""
+            read -p "  Enter your Zotero User ID: " ZOTERO_LIBRARY_ID
+            echo ""
+
+            if [[ -n "$ZOTERO_LIBRARY_ID" ]]; then
+                success "API credentials captured"
+                pause 0.3
+            else
+                warn "No User ID provided. Configuring local-only mode."
+                ENABLE_WRITE_SUPPORT=""
+                ZOTERO_API_KEY=""
+            fi
+        fi
+    fi
+
+    if [[ -z "$ZOTERO_API_KEY" ]]; then
     else
         warn "Skipping API key setup."
         ENABLE_WRITE_SUPPORT=""
@@ -604,8 +665,8 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
     fi
 
     if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
-        # Check if Zotero is reachable before building
-        if ! curl -s --max-time 2 http://127.0.0.1:23119/api/users/0/items?limit=1 >/dev/null 2>&1; then
+        # Check if Zotero is reachable — retry loop
+        while ! curl -s --max-time 2 http://127.0.0.1:23119/api/users/0/items?limit=1 >/dev/null 2>&1; do
             echo ""
             warn "Cannot connect to Zotero."
             echo ""
@@ -622,17 +683,20 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
             echo "   Once you've checked both, press Enter to try again"
             echo "   or press S to skip the database build."
             echo ""
-            read -p "   [Enter to retry / S to skip]: " -r
+            read -p "   [Enter to retry / S to skip]: " -n 1 -r
+            echo
             if [[ $REPLY =~ ^[Ss]$ ]]; then
                 info "Skipping database build."
                 echo "   Start Zotero with the setting enabled, then run:"
                 echo "   $ZOTERO_MCP_PATH update-db --fulltext"
                 echo "   Or just open Claude Desktop — it will build automatically."
                 BUILD_SEMANTIC_DB="no"
+                break
             fi
-        fi
+            # If Enter was pressed, the while loop re-checks connectivity
+        done
 
-        if [[ "$BUILD_SEMANTIC_DB" == "yes" ]] && curl -s --max-time 2 http://127.0.0.1:23119/api/users/0/items?limit=1 >/dev/null 2>&1; then
+        if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
             echo ""
             info "Building semantic search database with full-text indexing..."
             info "This indexes the content of your papers for better search."
@@ -645,16 +709,12 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
             if ZOTERO_LOCAL=true "$ZOTERO_MCP_PATH" update-db --fulltext 2>&1; then
                 echo ""
                 success "Semantic search database built"
-                pause 0.5            else
+                pause 0.5
+            else
                 echo ""
                 warn "Database build had issues. You can try again later with:"
                 echo "   $ZOTERO_MCP_PATH update-db --fulltext --force-rebuild"
             fi
-        else
-            warn "Still cannot connect to Zotero — skipping database build."
-            echo "   Make sure Zotero is running with the 'Allow other applications'"
-            echo "   setting enabled, then run: $ZOTERO_MCP_PATH update-db --fulltext"
-            echo "   Or just open Claude Desktop — it will build automatically."
         fi
     fi
 fi

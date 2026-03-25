@@ -241,52 +241,94 @@ if ($SetupMode -eq "2") {
 if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
     $EnableWrite = $true
 
+    # Check for existing credentials in Claude Desktop config
+    $ExistingApiKey = ""
+    $ExistingLibraryId = ""
+    if (Test-Path $ClaudeConfigFile) {
+        try {
+            $existingConfig = Get-Content $ClaudeConfigFile -Raw | ConvertFrom-Json
+            $ExistingApiKey = $existingConfig.mcpServers.zotero.env.ZOTERO_API_KEY
+            $ExistingLibraryId = $existingConfig.mcpServers.zotero.env.ZOTERO_LIBRARY_ID
+        } catch { }
+    }
+
     Write-Host ""
     Write-Host "-- Setting up Zotero API Access --" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  To enable write operations, you need a Zotero API key."
-    Write-Host ""
-    Write-Host "  Note: You'll need to be logged in to Zotero on the web."
-    Write-Host "  If you haven't verified your email with Zotero yet, you"
-    Write-Host "  may need to do that first."
-    Write-Host ""
-    Write-Host "  1. Go to: https://www.zotero.org/settings/keys"
-    Write-Host "     (If that link doesn't work, go to zotero.org, log in,"
-    Write-Host "      then navigate to Settings > Feeds/API)"
-    Write-Host "  2. Click 'Create new private key'"
-    Write-Host "  3. Give it a name (e.g., 'Claude MCP')"
-    Write-Host "  4. Check ALL of these under 'Personal Library':"
-    Write-Host "     - Allow library access"
-    Write-Host "     - Allow write access"
-    Write-Host "     - Allow notes access"
-    Write-Host "  5. Click 'Save Key' and copy the key shown"
-    Write-Host ""
-    $ApiKey = Read-Host "  Enter your Zotero API Key (or press Enter to skip)"
 
-    if ($ApiKey) {
+    if ($ExistingApiKey -and $ExistingLibraryId) {
+        $maskedKey = $ExistingApiKey.Substring(0,4) + "***" + $ExistingApiKey.Substring($ExistingApiKey.Length - 4)
+        Write-Host "  Existing credentials found in your config:"
         Write-Host ""
-        Write-Host "  Now we need your Zotero User ID."
-        Write-Host "  Go back to: https://www.zotero.org/settings/keys"
-        Write-Host "  Your User ID is the number labeled 'Your userID for"
-        Write-Host "  use in API calls' - it's NOT your username."
+        Write-Host "    API Key:  $maskedKey"
+        Write-Host "    User ID:  $ExistingLibraryId"
         Write-Host ""
-        $LibraryId = Read-Host "  Enter your Zotero User ID"
-
-        if ($LibraryId) {
-            Success "API credentials captured"
+        Write-Host "  Recommended: Keep existing"
+        $keepReply = Read-Host "  Keep these credentials? (Y/n)"
+        if ($keepReply -notmatch "^[Nn]") {
+            $ApiKey = $ExistingApiKey
+            $LibraryId = $ExistingLibraryId
+            Success "Using existing API credentials"
         } else {
-            Warn "No User ID provided. Configuring local-only mode."
+            Write-Host ""
+            Write-Host "  Enter new credentials below."
+            $ExistingApiKey = ""
+        }
+    }
+
+    if (-not $ApiKey) {
+        Write-Host "  To enable write operations (adding papers, managing collections,"
+        Write-Host "  updating metadata), you need a Zotero API key."
+        Write-Host ""
+        Write-Host "  Note: You'll need to be logged in to Zotero on the web."
+        Write-Host "  If you haven't verified your email with Zotero yet, you"
+        Write-Host "  may need to do that first."
+        Write-Host ""
+        Write-Host "  1. Go to this URL:"
+        Write-Host ""
+        Write-Host "     https://www.zotero.org/settings/keys"
+        Write-Host ""
+        Write-Host "     (If that link doesn't work, go to zotero.org, log in,"
+        Write-Host "      then navigate to Settings > Feeds/API)"
+        Write-Host "  2. Click 'Create new private key'"
+        Write-Host "  3. Give it a name (e.g., 'Claude MCP')"
+        Write-Host "  4. Under 'Personal Library', check ALL of these:"
+        Write-Host "     - Allow library access"
+        Write-Host "     - Allow write access"
+        Write-Host "     - Allow notes access"
+        Write-Host "  5. Click 'Save Key' and copy the key shown"
+        Write-Host ""
+        $ApiKey = Read-Host "  Enter your Zotero API Key (or press Enter to skip)"
+
+        if ($ApiKey) {
+            Write-Host ""
+            Write-Host "  Now we need your Zotero User ID."
+            Write-Host ""
+            Write-Host "  Go back to this URL:"
+            Write-Host ""
+            Write-Host "     https://www.zotero.org/settings/keys"
+            Write-Host ""
+            Write-Host "  Your User ID is the number labeled 'Your userID for"
+            Write-Host "  use in API calls' - it's NOT your username."
+            Write-Host ""
+            $LibraryId = Read-Host "  Enter your Zotero User ID"
+
+            if ($LibraryId) {
+                Success "API credentials captured"
+            } else {
+                Warn "No User ID provided. Configuring local-only mode."
+                $EnableWrite = $false
+                $ApiKey = ""
+            }
+        } else {
+            Warn "Skipping API key setup. Read-only local mode."
             $EnableWrite = $false
-            $ApiKey = ""
+            if ($AccessMode -eq "web") {
+                Fail "Web API mode requires an API key. Switching to local-only."
+                $AccessMode = "local"
+            }
+            Info "Re-run this script later to add write support."
         }
-    } else {
-        Warn "Skipping API key setup. Read-only local mode."
-        $EnableWrite = $false
-        if ($AccessMode -eq "web") {
-            Fail "Web API mode requires an API key. Switching to local-only."
-            $AccessMode = "local"
-        }
-        Info "Re-run this script later to add write support."
     }
 }
 
@@ -472,8 +514,41 @@ if ($BuildDb) {
     }
 
     if ($BuildDb) {
-        try {
-            $testReq = Invoke-WebRequest -Uri "http://127.0.0.1:23119/api/users/0/items?limit=1" -TimeoutSec 2 -ErrorAction Stop
+        # Retry loop for Zotero connectivity
+        $connected = $false
+        while (-not $connected) {
+            try {
+                $testReq = Invoke-WebRequest -Uri "http://127.0.0.1:23119/api/users/0/items?limit=1" -TimeoutSec 2 -ErrorAction Stop
+                $connected = $true
+            } catch {
+                Write-Host ""
+                Warn "Cannot connect to Zotero."
+                Write-Host ""
+                Write-Host "   Please make sure:"
+                Write-Host "   1. Zotero is running"
+                Write-Host "   2. This setting is ENABLED in Zotero:"
+                Write-Host ""
+                Write-Host "      Edit > Settings > Advanced"
+                Write-Host ""
+                Write-Host "      [x] Allow other applications on this computer"
+                Write-Host "          to communicate with Zotero"
+                Write-Host ""
+                Write-Host "   Once you've checked both, press Enter to try again"
+                Write-Host "   or type S to skip the database build."
+                Write-Host ""
+                $retryReply = Read-Host "   [Enter to retry / S to skip]"
+                if ($retryReply -match "^[Ss]") {
+                    Info "Skipping database build."
+                    Write-Host "   Start Zotero with the setting enabled, then run:"
+                    Write-Host "   $ZoteroMcpPath update-db --fulltext"
+                    Write-Host "   Or just open Claude Desktop - it will build automatically."
+                    $BuildDb = $false
+                    break
+                }
+            }
+        }
+
+        if ($BuildDb) {
             Write-Host ""
             Info "Building semantic search database with full-text indexing..."
             Info "This indexes the content of your papers for better search."
@@ -484,13 +559,15 @@ if ($BuildDb) {
             Write-Host ""
 
             $env:ZOTERO_LOCAL = "true"
-            & $ZoteroMcpPath update-db --fulltext
-            Write-Host ""
-            Success "Semantic search database built"
-        } catch {
-            Warn "Zotero doesn't appear to be running - skipping database build."
-            Write-Host "   Start Zotero, then run: $ZoteroMcpPath update-db --fulltext"
-            Write-Host "   Or just open Claude Desktop - it will build automatically."
+            try {
+                & $ZoteroMcpPath update-db --fulltext
+                Write-Host ""
+                Success "Semantic search database built"
+            } catch {
+                Write-Host ""
+                Warn "Database build had issues. You can try again later with:"
+                Write-Host "   $ZoteroMcpPath update-db --fulltext --force-rebuild"
+            }
         }
     }
 }
