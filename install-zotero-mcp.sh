@@ -186,6 +186,7 @@ fi
 echo ""
 
 # Defaults
+SETUP_MODE="1"
 ZOTERO_API_KEY=""
 ZOTERO_LIBRARY_ID=""
 ENABLE_WRITE_SUPPORT=""
@@ -283,6 +284,11 @@ if [[ "$SETUP_MODE" == "2" ]]; then
         echo ""
         read -p "  Enter number of pages (default: 50): " PDF_INDEX_INPUT
         PDF_INDEX_PAGES="${PDF_INDEX_INPUT:-50}"
+        # Validate numeric input
+        if ! [[ "$PDF_INDEX_PAGES" =~ ^[0-9]+$ ]]; then
+            warn "Invalid input '$PDF_INDEX_PAGES'. Using default: 50"
+            PDF_INDEX_PAGES="50"
+        fi
     fi
 
     # Display pages
@@ -298,6 +304,10 @@ if [[ "$SETUP_MODE" == "2" ]]; then
     echo ""
     read -p "  Enter number of pages (default: 10): " PDF_DISPLAY_INPUT
     PDF_DISPLAY_PAGES="${PDF_DISPLAY_INPUT:-10}"
+    if ! [[ "$PDF_DISPLAY_PAGES" =~ ^[0-9]+$ ]]; then
+        warn "Invalid input '$PDF_DISPLAY_PAGES'. Using default: 10"
+        PDF_DISPLAY_PAGES="10"
+    fi
 
     # Semantic DB build timing
     if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" ]]; then
@@ -665,7 +675,7 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
 
     if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
         # Check if Zotero is reachable — retry loop
-        while ! curl -s --max-time 2 http://127.0.0.1:23119/api/users/0/items?limit=1 >/dev/null 2>&1; do
+        while ! curl -s --max-time 2 "http://127.0.0.1:23119/api/users/0/items?limit=1" >/dev/null 2>&1; do
             echo ""
             warn "Cannot connect to Zotero."
             echo ""
@@ -720,7 +730,8 @@ fi
 
 # ============================================================================
 # STEP 8: Complete!
-npause 1# ============================================================================
+pause 1
+# ============================================================================
 
 echo ""
 echo ""
