@@ -28,6 +28,24 @@ success() { echo -e "${GREEN}  ✓${NC} $1"; }
 warn()    { echo -e "${YELLOW}  ⚠${NC} $1"; }
 fail()    { echo -e "${RED}  ✗${NC} $1"; }
 
+# UX helpers
+pause()   { sleep "${1:-0.5}"; }  # Brief pause between sections
+section() { echo ""; echo -e "${CYAN}━━ $1 ━━${NC}"; echo ""; pause 0.3; }
+
+# Spinner for long-running operations
+spin() {
+    local pid=$1
+    local msg="${2:-Working...}"
+    local chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\r  ${BLUE}%s${NC} %s" "${chars:i%${#chars}:1}" "$msg"
+        i=$((i + 1))
+        sleep 0.1
+    done
+    printf "\r%*s\r" $((${#msg} + 6)) ""  # Clear spinner line
+}
+
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║          Zotero MCP Server — Installation Script         ║${NC}"
@@ -42,8 +60,7 @@ echo ""
 # STEP 1: Prerequisites
 # ============================================================================
 
-echo -e "${CYAN}━━ Checking Prerequisites ━━${NC}"
-echo ""
+section "Checking Prerequisites"
 
 # Check we're on macOS
 if [[ "$(uname)" != "Darwin" ]]; then
@@ -167,8 +184,6 @@ fi
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}━━ Installation Mode ━━${NC}"
-echo ""
 
 # Defaults
 ZOTERO_API_KEY=""
@@ -205,7 +220,7 @@ fi
 if [[ "$SETUP_MODE" == "2" ]]; then
 
     # Access mode
-    echo -e "${CYAN}━━ Access Mode ━━${NC}"
+    section "Access Mode"
     echo ""
     echo "  How should the MCP connect to Zotero?"
     echo ""
@@ -233,7 +248,7 @@ if [[ "$SETUP_MODE" == "2" ]]; then
 
     # Semantic search
     if [[ "$ACCESS_MODE" != "web" ]]; then
-        echo -e "${CYAN}━━ Semantic Search Settings ━━${NC}"
+        section "Semantic Search Settings"
         echo ""
         echo "  Semantic search lets you find papers by meaning, not just keywords."
         echo "  For example: \"papers about the relationship between sleep and memory\""
@@ -257,8 +272,6 @@ if [[ "$SETUP_MODE" == "2" ]]; then
     # PDF indexing pages
     if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" ]]; then
         echo ""
-        echo -e "${CYAN}━━ PDF Indexing for Semantic Search ━━${NC}"
-        echo ""
         echo "  How many pages of each PDF should be indexed for search?"
         echo "  More pages = better search but longer initial build time."
         echo "  By default, this uses a local model — no tokens or usage"
@@ -273,8 +286,6 @@ if [[ "$SETUP_MODE" == "2" ]]; then
     fi
 
     # Display pages
-    echo ""
-    echo -e "${CYAN}━━ Claude Reading Limit ━━${NC}"
     echo ""
     echo "  When Claude reads a paper during conversation, how many pages"
     echo "  should it have access to and read? More pages = better"
@@ -312,8 +323,6 @@ if [[ "$ACCESS_MODE" == "hybrid" ]] || [[ "$ACCESS_MODE" == "web" ]]; then
     ENABLE_WRITE_SUPPORT="true"
 
     echo ""
-    echo -e "${CYAN}━━ Setting up Zotero API Access ━━${NC}"
-    echo ""
     echo "  To enable write operations (adding papers, managing collections,"
     echo "  updating metadata), you'll need a Zotero API key."
     echo ""
@@ -347,7 +356,7 @@ if [[ "$ACCESS_MODE" == "hybrid" ]] || [[ "$ACCESS_MODE" == "web" ]]; then
 
         if [[ -n "$ZOTERO_LIBRARY_ID" ]]; then
             success "API credentials captured"
-        else
+            pause 0.3        else
             warn "No User ID provided. Configuring local-only mode."
             ENABLE_WRITE_SUPPORT=""
             ZOTERO_API_KEY=""
@@ -369,8 +378,6 @@ fi
 # STEP 3: Install uv
 # ============================================================================
 
-echo ""
-echo -e "${CYAN}━━ Installing Dependencies ━━${NC}"
 echo ""
 
 if command -v uv &>/dev/null; then
@@ -407,8 +414,6 @@ fi
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}━━ Installing Zotero MCP Server ━━${NC}"
-echo ""
 echo "  Note: macOS may ask for permission to access your Downloads"
 echo "  or other folders. If you see a popup, click \"Allow\"."
 echo ""
@@ -425,12 +430,14 @@ fi
 INSTALL_PKG="zotero-mcp-server[all]"
 
 if uv tool list 2>/dev/null | grep -q "zotero-mcp-server"; then
-    uv tool install --force --reinstall "$INSTALL_PKG" 2>&1 | tail -1
+    uv tool install --force --reinstall "$INSTALL_PKG" > /dev/null 2>&1 &
 else
-    uv tool install "$INSTALL_PKG" 2>&1 | tail -1
+    uv tool install "$INSTALL_PKG" > /dev/null 2>&1 &
 fi
+spin $! "Installing Zotero MCP server..."
+wait $!
 success "Zotero MCP server installed"
-
+pause 0.5
 # Ensure ~/.local/bin is in PATH (uv tool install puts executables here)
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -468,8 +475,6 @@ fi
 # STEP 5: Configure Claude Desktop
 # ============================================================================
 
-echo ""
-echo -e "${CYAN}━━ Configuring Claude Desktop ━━${NC}"
 echo ""
 
 # Build environment variables based on access mode
@@ -523,14 +528,12 @@ with open(config_path, 'w') as f:
 PYEOF
 
 success "Claude Desktop configured for $(echo "$ACCESS_MODE" | sed 's/hybrid/hybrid (read + write)/;s/local/local-only (read)/;s/web/web API/') mode"
-
+pause 0.5
 # ============================================================================
 # STEP 6: Configure Semantic Search
 # ============================================================================
 
 if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" ]]; then
-    echo ""
-    echo -e "${CYAN}━━ Configuring Semantic Search ━━${NC}"
     echo ""
 
     SEMANTIC_CONFIG_DIR="$HOME/.config/zotero-mcp"
@@ -570,8 +573,6 @@ PYEOF
     success "Full-text indexing: enabled"
     success "PDF indexing limit: $PDF_INDEX_PAGES pages"
     echo ""
-    echo -e "${CYAN}━━ Claude Reading Limit ━━${NC}"
-    echo ""
     success "Display limit: $PDF_DISPLAY_PAGES pages"
 fi
 
@@ -580,8 +581,6 @@ fi
 # ============================================================================
 
 if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
-    echo ""
-    echo -e "${CYAN}━━ Semantic Search Database ━━${NC}"
     echo ""
 
     # Check if database already exists
@@ -646,7 +645,7 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
             if ZOTERO_LOCAL=true "$ZOTERO_MCP_PATH" update-db --fulltext 2>&1; then
                 echo ""
                 success "Semantic search database built"
-            else
+                pause 0.5            else
                 echo ""
                 warn "Database build had issues. You can try again later with:"
                 echo "   $ZOTERO_MCP_PATH update-db --fulltext --force-rebuild"
@@ -662,7 +661,7 @@ fi
 
 # ============================================================================
 # STEP 8: Complete!
-# ============================================================================
+npause 1# ============================================================================
 
 echo ""
 echo ""
@@ -706,4 +705,3 @@ if [[ "$ENABLE_SEMANTIC_SEARCH" == "no" ]]; then
     echo "  $ZOTERO_MCP_PATH update-db --fulltext"
 fi
 
-echo ""
