@@ -7,14 +7,17 @@
 Use Claude to manage and interact with your entire Zotero library — search papers, add references, manage collections, read full texts, and more. To set it up:
 
 1. Download the install script for your system:
-   - **Mac:** [install-zotero-mcp.sh](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.sh) (right-click > "Save Link As..." to download)
-   - **Windows:** [install-zotero-mcp.ps1](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.ps1) (right-click > "Save Link As..." to download)
+   - **Mac:** [install-zotero-mcp.sh](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.sh) — right-click the link > "Download Linked File" (or "Save Link As...")
+   - **Windows:** [install-zotero-mcp.ps1](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.ps1) — right-click the link > "Save link as..."
 2. Install [Zotero 8](https://www.zotero.org/download/) and [Claude Desktop](https://claude.ai/download) if you don't have them already
-3. In Zotero: **Settings > General** > check **"Allow other applications to communicate with Zotero"**
+3. In Zotero: **Settings > Advanced** > check **"Allow other applications to communicate with Zotero"**
 4. Run the install script:
    - **Mac:** Open Terminal and run `bash ~/Downloads/install-zotero-mcp.sh`
+     *(If macOS asks to allow Terminal to access your Downloads folder, click "Allow")*
    - **Windows:** Right-click the downloaded file > "Run with PowerShell"
 5. The script walks you through everything else. When it's done, restart Claude Desktop and start chatting.
+
+*If any of this didn't make sense, keep reading below for a more detailed step-by-step guide.*
 
 ---
 
@@ -39,8 +42,8 @@ Make sure you have these three things installed:
    - **Windows:** [install-zotero-mcp.ps1](https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/install-zotero-mcp.ps1) (right-click > "Save Link As...")
 
 You'll also need to turn on one setting in Zotero:
-- **Mac:** Open Zotero > **Settings > General** > check **"Allow other applications to communicate with Zotero"**
-- **Windows:** Open Zotero > **Edit > Settings > General** > check **"Allow other applications to communicate with Zotero"**
+- **Mac:** Open Zotero > **Settings > Advanced** > check **"Allow other applications to communicate with Zotero"**
+- **Windows:** Open Zotero > **Edit > Settings > Advanced** > check **"Allow other applications to communicate with Zotero"**
 
 This is what lets Claude read your library. 
 

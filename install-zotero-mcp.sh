@@ -197,7 +197,7 @@ else
     echo "    2) Advanced"
     echo "       Choose your access mode and customize settings"
     echo ""
-    read -p "  Enter choice (1/2): " SETUP_MODE
+    read -p "  Press 1 or 2: " -n 1 SETUP_MODE
     echo ""
 fi
 
@@ -222,7 +222,7 @@ if [[ "$SETUP_MODE" == "2" ]]; then
     echo "       Works without Zotero running, but slower and limited:"
     echo "       no semantic search, PDF features, or full-text access"
     echo ""
-    read -p "  Enter choice (1/2/3): " ACCESS_CHOICE
+    read -p "  Press 1, 2, or 3: " -n 1 ACCESS_CHOICE
     echo ""
 
     case "$ACCESS_CHOICE" in
@@ -315,20 +315,30 @@ if [[ "$ACCESS_MODE" == "hybrid" ]] || [[ "$ACCESS_MODE" == "web" ]]; then
     echo "  To enable write operations (adding papers, managing collections,"
     echo "  updating metadata), you'll need a Zotero API key."
     echo ""
-    echo "  1. Go to: https://zotero.org/settings/keys"
+    echo "  Note: You'll need to be logged in to Zotero on the web."
+    echo "  If you haven't verified your email with Zotero yet, you"
+    echo "  may need to do that first."
+    echo ""
+    echo "  1. Go to: https://www.zotero.org/settings/keys"
+    echo "     (If that link doesn't work, go to zotero.org, log in,"
+    echo "      then navigate to Settings > Feeds/API)"
     echo "  2. Click \"Create new private key\""
     echo "  3. Give it a name (e.g., \"Claude MCP\")"
-    echo "  4. Under \"Personal Library\", check:"
+    echo "  4. Under \"Personal Library\", check ALL of these:"
     echo "       ☐ Allow library access"
     echo "       ☐ Allow write access"
+    echo "       ☐ Allow notes access"
     echo "  5. Click \"Save Key\" and copy the key shown"
     echo ""
     read -p "  Enter your Zotero API Key (or press Enter to skip): " ZOTERO_API_KEY
     echo ""
 
     if [[ -n "$ZOTERO_API_KEY" ]]; then
-        echo "  Your User ID is labeled \"Your userID for use in API calls\""
-        echo "  on the same page — it's the number, not your username."
+        echo ""
+        echo "  Now we need your Zotero User ID."
+        echo "  Go back to: https://www.zotero.org/settings/keys"
+        echo "  Your User ID is the number labeled \"Your userID for"
+        echo "  use in API calls\" — it's NOT your username."
         echo ""
         read -p "  Enter your Zotero User ID: " ZOTERO_LIBRARY_ID
         echo ""
@@ -397,6 +407,9 @@ fi
 echo ""
 echo -e "${CYAN}━━ Installing Zotero MCP Server ━━${NC}"
 echo ""
+echo "  Note: macOS may ask for permission to access your Downloads"
+echo "  or other folders. If you see a popup, click \"Allow\"."
+echo ""
 info "Please wait while we download and install the server"
 info "with all dependencies (may take a minute or two)..."
 echo ""
@@ -416,22 +429,36 @@ else
 fi
 success "Zotero MCP server installed"
 
-# Find the executable
+# Ensure ~/.local/bin is in PATH (uv tool install puts executables here)
+export PATH="$HOME/.local/bin:$PATH"
+
+# Find the executable — check multiple locations
 ZOTERO_MCP_PATH=""
-CANDIDATE="$HOME/.local/bin/zotero-mcp"
-if [[ -f "$CANDIDATE" && -x "$CANDIDATE" ]]; then
-    ZOTERO_MCP_PATH="$CANDIDATE"
-fi
-
-if [[ -z "$ZOTERO_MCP_PATH" ]]; then
-    FOUND_PATH="$(command -v zotero-mcp 2>/dev/null || true)"
-    if [[ -n "$FOUND_PATH" && "$FOUND_PATH" != *"/.cache/uv/"* ]]; then
-        ZOTERO_MCP_PATH="$FOUND_PATH"
+for CANDIDATE in \
+    "$HOME/.local/bin/zotero-mcp" \
+    "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/zotero-mcp" \
+    "$(command -v zotero-mcp 2>/dev/null || true)"; do
+    if [[ -n "$CANDIDATE" && -f "$CANDIDATE" && -x "$CANDIDATE" ]]; then
+        # Skip uv cache paths (temporary, not stable)
+        if [[ "$CANDIDATE" != *"/.cache/uv/"* ]]; then
+            ZOTERO_MCP_PATH="$CANDIDATE"
+            break
+        fi
     fi
-fi
+done
 
 if [[ -z "$ZOTERO_MCP_PATH" ]]; then
-    fail "Could not locate zotero-mcp executable."
+    echo ""
+    fail "Could not locate the zotero-mcp executable."
+    echo ""
+    echo "   This usually means uv installed it in an unexpected location."
+    echo "   Try running this command to find it:"
+    echo "     uv tool list"
+    echo ""
+    echo "   Or try reinstalling manually:"
+    echo "     uv tool install --force zotero-mcp-server[all]"
+    echo ""
+    echo "   Then re-run this script."
     exit 1
 fi
 
@@ -584,8 +611,8 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
             echo "   1. Zotero is running"
             echo "   2. This setting is ENABLED in Zotero:"
             echo ""
-            echo "      Mac:     Settings > General"
-            echo "      Windows: Edit > Settings > General"
+            echo "      Mac:     Settings > Advanced"
+            echo "      Windows: Edit > Settings > Advanced"
             echo ""
             echo "      ☑ Allow other applications on this computer"
             echo "        to communicate with Zotero"
@@ -648,7 +675,7 @@ echo -e "${BOLD}║${NC}     \"What papers are in my library about [topic]?\"   
 echo -e "${BOLD}║${NC}                                                          ${BOLD}║${NC}"
 echo -e "${BOLD}║${NC}  ${RED}>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>${NC}    ${BOLD}║${NC}"
 echo -e "${BOLD}║${NC}  ${RED}>>> ${BOLD}IMPORTANT: In Zotero, go to:${NC}                    ${RED}<<<${NC}  ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${RED}>>>   Settings > General${NC}                            ${RED}<<<${NC}  ${BOLD}║${NC}"
+echo -e "${BOLD}║${NC}  ${RED}>>>   Settings > Advanced${NC}                            ${RED}<<<${NC}  ${BOLD}║${NC}"
 echo -e "${BOLD}║${NC}  ${RED}>>> ${BOLD}and make sure this is CHECKED:${NC}                  ${RED}<<<${NC}  ${BOLD}║${NC}"
 echo -e "${BOLD}║${NC}  ${RED}>>>   ☑ Allow other applications on this computer${NC} ${RED}<<<${NC}  ${BOLD}║${NC}"
 echo -e "${BOLD}║${NC}  ${RED}>>>     to communicate with Zotero${NC}                  ${RED}<<<${NC}  ${BOLD}║${NC}"

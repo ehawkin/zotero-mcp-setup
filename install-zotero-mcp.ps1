@@ -244,17 +244,29 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
     Write-Host ""
     Write-Host "  To enable write operations, you need a Zotero API key."
     Write-Host ""
-    Write-Host "  1. Go to: https://zotero.org/settings/keys"
+    Write-Host "  Note: You'll need to be logged in to Zotero on the web."
+    Write-Host "  If you haven't verified your email with Zotero yet, you"
+    Write-Host "  may need to do that first."
+    Write-Host ""
+    Write-Host "  1. Go to: https://www.zotero.org/settings/keys"
+    Write-Host "     (If that link doesn't work, go to zotero.org, log in,"
+    Write-Host "      then navigate to Settings > Feeds/API)"
     Write-Host "  2. Click 'Create new private key'"
-    Write-Host "  3. Check 'Allow library access' and 'Allow write access'"
-    Write-Host "  4. Save and copy the key"
+    Write-Host "  3. Give it a name (e.g., 'Claude MCP')"
+    Write-Host "  4. Check ALL of these under 'Personal Library':"
+    Write-Host "     - Allow library access"
+    Write-Host "     - Allow write access"
+    Write-Host "     - Allow notes access"
+    Write-Host "  5. Click 'Save Key' and copy the key shown"
     Write-Host ""
     $ApiKey = Read-Host "  Enter your Zotero API Key (or press Enter to skip)"
 
     if ($ApiKey) {
         Write-Host ""
-        Write-Host "  Your User ID is labeled 'Your userID for use in API calls'"
-        Write-Host "  on the same page - it's the number, not your username."
+        Write-Host "  Now we need your Zotero User ID."
+        Write-Host "  Go back to: https://www.zotero.org/settings/keys"
+        Write-Host "  Your User ID is the number labeled 'Your userID for"
+        Write-Host "  use in API calls' - it's NOT your username."
         Write-Host ""
         $LibraryId = Read-Host "  Enter your Zotero User ID"
 
@@ -498,7 +510,7 @@ Write-Host "|     'What papers are in my library about [topic]?'       |" -Foreg
 Write-Host "|                                                           |" -ForegroundColor White
 Write-Host "|  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" -ForegroundColor Red -NoNewline; Write-Host "    |" -ForegroundColor White
 Write-Host "|  >>> " -ForegroundColor Red -NoNewline; Write-Host "IMPORTANT: In Zotero, go to:" -ForegroundColor White -NoNewline; Write-Host "                    <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
-Write-Host "|  >>>   Settings > General" -ForegroundColor Red -NoNewline; Write-Host "                            <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
+Write-Host "|  >>>   Settings > Advanced" -ForegroundColor Red -NoNewline; Write-Host "                            <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
 Write-Host "|  >>> " -ForegroundColor Red -NoNewline; Write-Host "and make sure this is CHECKED:" -ForegroundColor White -NoNewline; Write-Host "                  <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
 Write-Host "|  >>>   Allow other applications on this computer " -ForegroundColor Red -NoNewline; Write-Host " <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
 Write-Host "|  >>>     to communicate with Zotero" -ForegroundColor Red -NoNewline; Write-Host "                  <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
