@@ -335,6 +335,12 @@ input:focus,select:focus{border-color:#D8D0C0}
   color:rgba(32,38,46,.7);margin:4px 0;font-style:italic;line-height:1.5}
 .badge{font-size:10px;color:#BECEC5;font-weight:500;background:rgba(190,206,197,.15);
   padding:2px 7px;border-radius:4px;margin-left:5px}
+.expand-link{font-size:13px;color:#20262E;cursor:pointer;padding:3px 0;margin:0;
+  text-decoration:underline;text-decoration-color:rgba(32,38,46,.2);text-underline-offset:3px}
+.expand-link:hover{text-decoration-color:rgba(32,38,46,.5)}
+.expand-link .arrow{display:inline-block;font-size:9px;margin-right:6px;transition:transform .2s;
+  color:rgba(32,38,46,.35);text-decoration:none}
+.expand-link .arrow.open{transform:rotate(90deg)}
 </style>
 </head>
 <body>
@@ -364,46 +370,73 @@ input:focus,select:focus{border-color:#D8D0C0}
 <!-- S0: Welcome + Prerequisites -->
 <div class="screen active" id="screen-0">
   <div class="card">
-    <p>This gives Claude the ability to:</p>
-    <div style="font-size:12.5px;color:rgba(32,38,46,.6);line-height:1.7;padding:4px 0 4px 6px">
+    <p class="expand-link" onclick="togglePanel('what-panel')"><span class="arrow" id="what-arrow">&#9654;</span> What does this setup do?</p>
+    <div id="what-panel" class="info-panel hidden">
+      Right now, Claude has no idea what's in your Zotero library. This installs a small piece of software that acts as a bridge between Claude and Zotero. Once running, Claude can:<br><br>
       • Search and browse your papers by keyword, author, or topic<br>
       • Read and discuss the content of your papers<br>
       • Add new papers by DOI, URL, or file<br>
-      • Manage collections, tags, and notes<br>
+      • Manage collections, create and remove tags and notes<br>
       • Find and merge duplicates<br>
-      • Highlight and annotate PDFs
+      • Highlight and annotate PDFs<br><br>
+      The setup handles everything automatically: installs the software, tells Claude Desktop where to find it, and builds a search index of your library.
     </div>
-    <p style="margin-top:4px"><span class="link" onclick="togglePanel('what-panel')">What does this setup actually do?</span></p>
-    <div id="what-panel" class="info-panel hidden">
-      Right now, Claude has no idea what's in your Zotero library. This installs a small piece of software called an MCP server that acts as a bridge between Claude and Zotero. Once running, Claude can search your library by title, author, keyword, or even by meaning (e.g., "papers about sleep and memory consolidation" finds relevant papers even if those exact words aren't in the title). The setup handles everything: installs the software, tells Claude where to find it, and builds a search index of your library.
+    <p class="expand-link" onclick="togglePanel('use-panel')"><span class="arrow" id="use-arrow">&#9654;</span> How to use Claude with Zotero</p>
+    <div id="use-panel" class="info-panel hidden">
+      1. Make sure Zotero is open on your computer<br>
+      2. Just ask Claude any questions about your library, or ask it to make changes<br><br>
+      <em>Note: You may briefly see a "response could not be fully generated" message when Claude is adding papers or downloading PDFs. This is normal - just wait a few seconds and it will complete.</em>
     </div>
-    <p style="margin-top:4px"><span class="link" onclick="togglePanel('learn-panel')">Learn more about what you can do</span></p>
-    <div id="learn-panel" class="info-panel hidden">
-      <strong>How to use it:</strong><br>
-      1. Make sure Zotero is open<br>
-      2. Just ask Claude — it can search, read, add, and manage your papers<br>
-      3. Don't worry about "response could not be fully generated" messages — Claude is still working<br><br>
-      <strong>Examples:</strong><br>
+    <p class="expand-link" onclick="togglePanel('ex-panel')"><span class="arrow" id="ex-arrow">&#9654;</span> Example prompts</p>
+    <div id="ex-panel" class="info-panel hidden">
+      <strong>Search and read:</strong><br>
       • "Search my library for papers about mindfulness interventions"<br>
       • "What papers do I have by Kingston et al.?"<br>
+      • "Show me the abstract for that paper about sleep and memory"<br>
+      • "Read the full text and summarize the methodology"<br>
+      • "Find papers related to this paragraph I'm writing: [paste text]"<br><br>
+      <strong>Add and organize:</strong><br>
       • "Add this paper by DOI: 10.1038/nature12373"<br>
+      • "Add this arXiv paper: https://arxiv.org/abs/1706.03762"<br>
       • "Create a collection called 'Thesis Chapter 3'"<br>
-      • "Find duplicate papers in my library and merge them"<br>
-      • "Highlight the key findings in the Wang 2025 paper"<br><br>
-      <strong>About PDFs:</strong> Claude auto-attaches open-access PDFs. For paywalled papers, connect to your university VPN, then in Zotero right-click the item and select "Find Available PDF."<br><br>
-      <strong>Usage tip:</strong> Use Sonnet for simple tasks (finding papers, extracting numbers). Use Opus for critical analysis and cross-paper synthesis.
+      • "Tag all my papers about CBT with 'CBT'"<br>
+      • "Find duplicate papers and merge them"<br><br>
+      <strong>Multi-step requests:</strong><br>
+      • "What are the three most seminal papers on Predictive Coding? Locate them and create a collection."<br>
+      • "Highlight in green any key findings in the Wang 2025 paper"<br>
+      • "Go through this collection and add a summary note to each paper"
     </div>
-    <p style="margin-top:4px"><span class="link" onclick="togglePanel('tech-panel')">Technical details</span></p>
+    <p class="expand-link" onclick="togglePanel('pdf-panel')"><span class="arrow" id="pdf-arrow">&#9654;</span> About adding PDFs</p>
+    <div id="pdf-panel" class="info-panel hidden">
+      When you ask Claude to add papers to your library, it attempts to attach open-access PDFs automatically. For paywalled papers, you may need to connect to your university VPN, then in Zotero right-click the item and select "Find Available PDF", or download and import them manually.
+    </div>
+    <p class="expand-link" onclick="togglePanel('usage-panel')"><span class="arrow" id="usage-arrow">&#9654;</span> Claude usage limit tips</p>
+    <div id="usage-panel" class="info-panel hidden">
+      Having Claude read the full text of papers may use a significant portion of your Claude usage allowance. A single paper can use 10,000+ tokens, and that cost compounds with every subsequent message.<br><br>
+      <strong>Tips to conserve usage:</strong><br>
+      • Ask Claude to search by topic rather than reading whole papers<br>
+      • Tell Claude what you need rather than asking it to read everything<br>
+      • Start new conversations when switching tasks<br><br>
+      <strong>For simpler tasks</strong> (finding papers, extracting numbers, summarizing), consider using a lighter model like Claude Sonnet.<br><br>
+      <strong>Use more powerful models like Claude Opus</strong> for critically evaluating methodology, synthesizing across papers, identifying contradictions, and generating novel arguments.
+    </div>
+    <p class="expand-link" onclick="togglePanel('tech-panel')"><span class="arrow" id="tech-arrow">&#9654;</span> Technical details</p>
     <div id="tech-panel" class="info-panel hidden">
       <strong>Privacy:</strong> Searches happen locally between Claude Desktop and Zotero on your machine. Write operations go through Zotero's secure cloud API (the same sync system Zotero already uses).<br><br>
       <strong>Two kinds of search:</strong> Basic search (title, author, keyword) works instantly. Semantic search (by meaning) uses a local AI model and a search index that auto-refreshes on startup.<br><br>
-      <strong>Manual index update:</strong><br>
-      Mac: <code>~/.local/bin/zotero-mcp update-db --fulltext</code><br>
-      Force full rebuild: <code>~/.local/bin/zotero-mcp update-db --fulltext --force-rebuild</code><br><br>
-      <strong>Project:</strong> <span class="link" onclick="pywebview.api.open_url('https://github.com/54yyyu/zotero-mcp')">github.com/54yyyu/zotero-mcp</span><br>
-      <strong>This installer:</strong> <span class="link" onclick="pywebview.api.open_url('https://github.com/ehawkin/zotero-mcp-setup')">github.com/ehawkin/zotero-mcp-setup</span>
+      <strong>Manual index update:</strong> If you prefer to update the search index yourself, you can run this in Terminal:<br>
+      <code>~/.local/bin/zotero-mcp update-db --fulltext</code><br><br>
+      You can also force a complete rebuild from scratch (applies new settings to all papers):<br>
+      <code>~/.local/bin/zotero-mcp update-db --fulltext --force-rebuild</code><br><br>
+      <strong>Project:</strong> <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://github.com/54yyyu/zotero-mcp')">github.com/54yyyu/zotero-mcp</span><br>
+      <strong>This installer:</strong> <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://github.com/ehawkin/zotero-mcp-setup')">github.com/ehawkin/zotero-mcp-setup</span>
     </div>
-    <div class="separator"></div>
+  </div>
+  <div class="important" style="margin-bottom:12px">
+    <strong>Required Zotero setting:</strong> In Zotero, go to <strong>Settings &rarr; Advanced</strong> and make sure this is checked:<br>
+    <strong>&check; Allow other applications on this computer to communicate with Zotero</strong>
+  </div>
+  <div class="card">
     <h2 style="font-size:14px">Prerequisites</h2>
     <div id="prereq-list"><div class="prereq-row"><div class="prereq-dot wait">...</div>Checking...</div></div>
   </div>
@@ -524,23 +557,33 @@ input:focus,select:focus{border-color:#D8D0C0}
   <div class="card">
     <div id="complete-box"></div>
   </div>
-  <div class="card hidden" id="guide-card">
-    <h2>How to Use</h2>
-    <div class="guide-section">
-      <h3>Getting Started</h3>
-      <p>1. Make sure Zotero is open<br>2. Open Claude Desktop (restart if already open)<br>3. Start chatting!</p>
+  <div class=”important hidden” id=”guide-zotero-setting” style=”margin-bottom:12px”>
+    <strong>Required Zotero setting:</strong> In Zotero, go to <strong>Settings &rarr; Advanced</strong> and make sure this is checked:<br>
+    <strong>&check; Allow other applications on this computer to communicate with Zotero</strong>
+  </div>
+  <div class=”card hidden” id=”guide-card”>
+    <h2>Getting Started</h2>
+    <p style=”font-size:13px;color:rgba(32,38,46,.6)”>1. Make sure Zotero is open<br>2. Open Claude Desktop (restart if already open)<br>3. Start chatting about your papers!</p>
+    <div class=”separator”></div>
+    <p class=”expand-link” onclick=”togglePanel('g-use-panel')”><span class=”arrow” id=”g-use-arrow”>&#9654;</span> How to use Claude with Zotero</p>
+    <div id=”g-use-panel” class=”info-panel hidden”>
+      Just ask Claude any questions about your library, or ask it to make changes.<br><br>
+      <em>Note: You may briefly see a “response could not be fully generated” message when Claude is adding papers or downloading PDFs. This is normal - just wait a few seconds.</em>
     </div>
-    <div class="guide-section">
-      <h3>Example Prompts</h3>
-      <div class="example">“What papers are in my library about mindfulness and depression?”</div>
-      <div class="example">“Find the paper by Kabat-Zinn from 2003”</div>
-      <div class="example">“Add this paper by DOI: 10.1038/nature12373”</div>
-      <div class="example">“Create a collection called Thesis Research and add my recent papers”</div>
-      <div class="example">“Highlight key findings in the Wang 2025 paper”</div>
+    <p class=”expand-link” onclick=”togglePanel('g-ex-panel')”><span class=”arrow” id=”g-ex-arrow”>&#9654;</span> Example prompts</p>
+    <div id=”g-ex-panel” class=”info-panel hidden”>
+      • “Search my library for papers about mindfulness interventions”<br>
+      • “What papers do I have by Kingston et al.?”<br>
+      • “Add this paper by DOI: 10.1038/nature12373”<br>
+      • “Create a collection called 'Thesis Chapter 3'”<br>
+      • “Find duplicates and merge them”<br>
+      • “Highlight the key findings in the Wang 2025 paper”<br>
+      • “What are the three most seminal papers on Predictive Coding? Locate them and create a collection.”
     </div>
-    <div class="guide-section">
-      <h3>Usage Tips</h3>
-      <p>Reading full papers uses significant Claude allowance. Search by topic rather than reading whole papers. Use Sonnet for extracting data; Opus for critical analysis.</p>
+    <p class=”expand-link” onclick=”togglePanel('g-usage-panel')”><span class=”arrow” id=”g-usage-arrow”>&#9654;</span> Claude usage limit tips</p>
+    <div id=”g-usage-panel” class=”info-panel hidden”>
+      Having Claude read full papers uses significant Claude allowance. Search by topic rather than reading whole papers. Tell Claude what you need specifically. Start new conversations when switching tasks.<br><br>
+      Use Sonnet for simple tasks (finding, extracting, summarizing). Use Opus for critical analysis and synthesis.
     </div>
   </div>
 </div>
@@ -594,7 +637,10 @@ function toggleCreds(mode){credMode=mode;
   }
 }
 
-function togglePanel(id){var p=document.getElementById(id);p.classList.toggle('hidden');if(!p.classList.contains('hidden'))setTimeout(function(){p.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}
+function togglePanel(id){var p=document.getElementById(id);p.classList.toggle('hidden');
+  var arrowId=id.replace('-panel','-arrow');var a=document.getElementById(arrowId);
+  if(a)a.classList.toggle('open',!p.classList.contains('hidden'));
+  if(!p.classList.contains('hidden'))setTimeout(function(){p.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}
 function toggleInfo(){togglePanel('info-panel')}
 
 function startInstall(){
@@ -619,7 +665,8 @@ function showComplete(ok,msg){goTo(5);const b=document.getElementById('complete-
     '<div class="important"><strong>Important:</strong> In Zotero, go to <strong>Settings → Advanced</strong> '+
     'and check:<br><br><strong>☑ Allow other applications on this computer to communicate with Zotero</strong>'+
     '<br><br>Without this, the MCP cannot connect.</div>';
-    document.getElementById('guide-card').classList.remove('hidden')}
+    document.getElementById('guide-card').classList.remove('hidden');
+    document.getElementById('guide-zotero-setting').classList.remove('hidden')}
   else{b.innerHTML='<h2 style="color:#9a3030">Setup Failed</h2>'+
     '<p style="font-size:13px;color:rgba(32,38,46,.6)">'+msg+'</p>'+
     '<div style="margin-top:12px"><button class="btn btn-outline" onclick="location.reload()">Try Again</button></div>'}

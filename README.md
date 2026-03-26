@@ -41,7 +41,7 @@ This guide explains how to use our setup script to create a direct connection be
 
 ### What does this actually do?
 
-Right now, Claude has no idea what's in your Zotero library. This script installs a small piece of software called an "MCP server" that acts as a bridge between Claude and Zotero. Once it's running, Claude can look through your library the same way you would — searching by title, author, keyword, or even by the *meaning* of what a paper is about (for example, asking "do I have anything about the relationship between sleep and memory consolidation?" will find relevant papers even if those exact words aren't in the title).
+Right now, Claude has no idea what's in your Zotero library. This script installs a small piece of software called an "MCP server" that acts as a bridge between Claude and Zotero. Once it's running, Claude can look through your library the same way you would — searching by title, author, keyword, or even by the *meaning* of what a paper is about (for example, asking "do I have anything about the relationship between sleep and memory consolidation?" will find relevant papers even if those exact words aren't in the title). It can also manage your library — creating collections, adding and removing tags and notes, making highlights across your documents, and more.
 
 The script handles the entire setup automatically: it installs the necessary software, tells Claude Desktop where to find it, and builds a search index of your library.
 
@@ -121,7 +121,8 @@ That's it — you're done.
 
 1. **Make sure Zotero is open** on your computer. Claude can only access your library while Zotero is running.
 2. **Just ask Claude.** Ask any questions you have about your library or particular papers, or ask it to make changes or additions to your library. It can pretty much do anything you can think of.
-3. **Don't worry about "response could not be fully generated" messages.** When Claude is adding papers, attaching PDFs, or doing other operations that involve downloading data, you may briefly see a message saying Claude's response could not be fully generated. This is normal — Claude is still working in the background (fetching metadata, downloading PDFs, etc.) and the message will go away once the operation finishes. Just wait a few seconds.
+
+**Note:** You may briefly see a "response could not be fully generated" message when Claude is adding papers, attaching PDFs, or doing other operations that involve downloading data. This is normal — Claude is still working in the background (fetching metadata, downloading PDFs, etc.) and the message will go away once the operation finishes. Just wait a few seconds.
 
 ### Examples of what you can do
 
@@ -160,9 +161,9 @@ You can also combine multiple actions in a single request:
 - **"Take a look at the 2025 paper on digital mindfulness interventions by Wang et al. and highlight in green any sentences in the abstract, discussion, or conclusion that you feel represent the core findings."** — Claude will find the paper, read the PDF, identify the key findings, and create green highlight annotations directly on the PDF in Zotero.
 - **"Go through all the papers in this collection and add a summary note to each one, including the key findings and the major limitations of the study."** — Claude will read each paper's abstract and metadata, then create a structured note attached to each one.
 
-**About Adding PDFs:** When Claude adds a paper to your library, it automatically tries to attach the full PDF. This works for arXiv papers (which are always freely available) and for open-access journal articles. For paywalled papers, Claude will add all the metadata but can't download the PDF — you'd need to get that through your university library or other access.
+**About Adding PDFs:** When you ask Claude to add papers to your library, it attempts to attach open-access PDFs automatically. This works for arXiv papers (always freely available) and open-access journal articles. For paywalled papers, Claude will add all the metadata but can't download the PDF — you may need to connect to your university VPN, then in Zotero right-click the item and select "Find Available PDF", or download and import them manually.
 
-**A note on usage limits:** Having Claude read the full text of papers (as opposed to just searching for them or reading their metadata) uses a significant portion of your Claude usage allowance. A single paper can use 10,000+ tokens, and that cost compounds with every subsequent message in the conversation.
+**Claude Usage Limit Tips:** Having Claude read the full text of papers (as opposed to just searching for them or reading their metadata) uses a significant portion of your Claude usage allowance. A single paper can use 10,000+ tokens, and that cost compounds with every subsequent message in the conversation.
 
 Tips to conserve usage:
 - Ask Claude to search for papers by topic rather than asking it to read through entire papers looking for something
