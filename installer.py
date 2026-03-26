@@ -423,11 +423,11 @@ input:focus,select:focus{border-color:#D8D0C0}
       </div>
     </div>
 
-    <div id="cred-fields">
+    <div id="cred-fields" class="hidden">
       <label>API Key <span style="color:rgba(32,38,46,.25)">(leave blank for read-only mode)</span></label>
       <input type="text" id="api-key" placeholder="Paste API key...">
       <label>User ID</label>
-      <input type="text" id="library-id" placeholder="Numeric user ID">
+      <input type="text" id="library-id" placeholder="Paste numeric user ID...">
       <p class="hint" style="margin-top:8px">You can find this at <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span> <button class="info-btn" onclick="toggleInfo()">i</button></p>
       <div id="info-panel" class="info-panel hidden">
         <strong>How to get your API key:</strong><br>
@@ -469,7 +469,7 @@ input:focus,select:focus{border-color:#D8D0C0}
     <p class="hint">More pages = better understanding but uses more Claude allowance.</p>
     <div class="separator"></div>
     <h2 style="font-size:14px">Search Database</h2>
-    <p>Building the database indexes your papers for semantic search (finding papers by meaning). This is a one-time process that takes 5\u201315 minutes. After that, it updates automatically.</p>
+    <p>Building the database indexes your papers for semantic search (finding papers by meaning). This is a one-time process that takes 5-15 minutes. After that, it updates automatically.</p>
     <div class="check-row"><input type="checkbox" id="build-db" checked>
       <label for="build-db" style="margin:0;cursor:pointer;font-size:13px">Build now (recommended)</label></div>
     <p class="hint" style="margin-top:6px">You can always build later by re-running this installer.</p>
@@ -534,13 +534,19 @@ function selectMode(m){selectedMode=m;
 function goToAfterMode(){goTo(2)}
 
 function continueFromCreds(){
-  // Validation: if entering new creds, check fields (unless blank = read-only)
+  if(credMode==='existing' && useExKey){
+    // Using existing credentials — no validation needed
+    if(selectedMode==='default'){goTo(4)}else{goTo(3)};return}
+  // Entering new credentials
   var key=document.getElementById('api-key').value.trim();
   var lid=document.getElementById('library-id').value.trim();
-  if(credMode==='new' || !useExKey){
-    if(key && !lid){alert('Please enter your User ID, or leave both fields blank for read-only mode.');return}
+  if(key && !lid){alert('Please also enter your User ID.');return}
+  if(!key && lid){alert('Please also enter your API Key.');return}
+  if(!key && !lid){
+    var msg='No API key entered. Continue in read-only mode?\n\nYou won\u2019t be able to add papers, manage collections, or make any changes to your library.';
+    if(useExKey){msg+='\n\nTip: You can switch to "Use existing" to use your previously saved credentials.'}
+    if(!confirm(msg)){return}
   }
-  // Default mode goes to install; Advanced goes to settings
   if(selectedMode==='default'){goTo(4)}else{goTo(3)}
 }
 
@@ -611,6 +617,10 @@ window.addEventListener('pywebviewready',function(){
       document.getElementById('cred-fields').classList.add('hidden');
       document.getElementById('api-key').value=useExKey;
       document.getElementById('library-id').value=useExId}
+    else{
+      // No existing credentials — show the entry fields
+      credMode='new';
+      document.getElementById('cred-fields').classList.remove('hidden')}
   })
 })
 </script>
