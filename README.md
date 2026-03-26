@@ -6,11 +6,11 @@
 
 ### New: Easy Installer App for Mac
 
-No terminal commands needed — just download, double-click, and follow the wizard:
+No terminal commands needed — just download, open, and follow the wizard:
 
-**[Download Zotero MCP Setup for Mac](https://github.com/ehawkin/zotero-mcp-setup/releases/download/v1.0.0/ZoteroMCPSetup-mac.zip)** (38MB)
+**[Download Zotero MCP Setup for Mac](https://github.com/ehawkin/zotero-mcp-setup/releases/download/v1.0.0/ZoteroMCPSetup-mac.dmg)** (17MB)
 
-Unzip and double-click "Zotero MCP Setup" to start. The app walks you through everything with a visual interface.
+Open the disk image and double-click "Zotero MCP Setup" to start. The app walks you through everything with a visual interface.
 
 *If you prefer using the terminal, or you're on Windows, see the instructions below.*
 
