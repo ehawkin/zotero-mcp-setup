@@ -373,6 +373,36 @@ input:focus,select:focus{border-color:#D8D0C0}
       • Find and merge duplicates<br>
       • Highlight and annotate PDFs
     </div>
+    <p style="margin-top:4px"><span class="link" onclick="togglePanel('what-panel')">What does this setup actually do?</span></p>
+    <div id="what-panel" class="info-panel hidden">
+      Right now, Claude has no idea what's in your Zotero library. This installs a small piece of software called an MCP server that acts as a bridge between Claude and Zotero. Once running, Claude can search your library by title, author, keyword, or even by meaning (e.g., "papers about sleep and memory consolidation" finds relevant papers even if those exact words aren't in the title). The setup handles everything: installs the software, tells Claude where to find it, and builds a search index of your library.
+    </div>
+    <p style="margin-top:4px"><span class="link" onclick="togglePanel('learn-panel')">Learn more about what you can do</span></p>
+    <div id="learn-panel" class="info-panel hidden">
+      <strong>How to use it:</strong><br>
+      1. Make sure Zotero is open<br>
+      2. Just ask Claude — it can search, read, add, and manage your papers<br>
+      3. Don't worry about "response could not be fully generated" messages — Claude is still working<br><br>
+      <strong>Examples:</strong><br>
+      • "Search my library for papers about mindfulness interventions"<br>
+      • "What papers do I have by Kingston et al.?"<br>
+      • "Add this paper by DOI: 10.1038/nature12373"<br>
+      • "Create a collection called 'Thesis Chapter 3'"<br>
+      • "Find duplicate papers in my library and merge them"<br>
+      • "Highlight the key findings in the Wang 2025 paper"<br><br>
+      <strong>About PDFs:</strong> Claude auto-attaches open-access PDFs. For paywalled papers, connect to your university VPN, then in Zotero right-click the item and select "Find Available PDF."<br><br>
+      <strong>Usage tip:</strong> Use Sonnet for simple tasks (finding papers, extracting numbers). Use Opus for critical analysis and cross-paper synthesis.
+    </div>
+    <p style="margin-top:4px"><span class="link" onclick="togglePanel('tech-panel')">Technical details</span></p>
+    <div id="tech-panel" class="info-panel hidden">
+      <strong>Privacy:</strong> Searches happen locally between Claude Desktop and Zotero on your machine. Write operations go through Zotero's secure cloud API (the same sync system Zotero already uses).<br><br>
+      <strong>Two kinds of search:</strong> Basic search (title, author, keyword) works instantly. Semantic search (by meaning) uses a local AI model and a search index that auto-refreshes on startup.<br><br>
+      <strong>Manual index update:</strong><br>
+      Mac: <code>~/.local/bin/zotero-mcp update-db --fulltext</code><br>
+      Force full rebuild: <code>~/.local/bin/zotero-mcp update-db --fulltext --force-rebuild</code><br><br>
+      <strong>Project:</strong> <span class="link" onclick="pywebview.api.open_url('https://github.com/54yyyu/zotero-mcp')">github.com/54yyyu/zotero-mcp</span><br>
+      <strong>This installer:</strong> <span class="link" onclick="pywebview.api.open_url('https://github.com/ehawkin/zotero-mcp-setup')">github.com/ehawkin/zotero-mcp-setup</span>
+    </div>
     <div class="separator"></div>
     <h2 style="font-size:14px">Prerequisites</h2>
     <div id="prereq-list"><div class="prereq-row"><div class="prereq-dot wait">...</div>Checking...</div></div>
@@ -564,7 +594,8 @@ function toggleCreds(mode){credMode=mode;
   }
 }
 
-function toggleInfo(){var p=document.getElementById('info-panel');p.classList.toggle('hidden');if(!p.classList.contains('hidden'))setTimeout(function(){p.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}
+function togglePanel(id){var p=document.getElementById(id);p.classList.toggle('hidden');if(!p.classList.contains('hidden'))setTimeout(function(){p.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}
+function toggleInfo(){togglePanel('info-panel')}
 
 function startInstall(){
   var key=document.getElementById('api-key').value.trim();

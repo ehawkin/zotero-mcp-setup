@@ -194,9 +194,12 @@ You don't need to read this section to use the tool — everything above is all 
 **Two kinds of search.** Basic search (by title, author, keyword, tag) works instantly for all items — no index needed. Semantic search (by meaning — "papers about the relationship between sleep and memory") uses a separate search index. The index refreshes automatically every time you open Claude Desktop, and Claude can also refresh it during a conversation after adding papers. If semantic search ever can't find something you know is in your library, just ask Claude to "update the search database."
 
 **Manual search index update.** If you prefer to update the search index yourself, you can run this in Terminal (Mac) or PowerShell (Windows):
-- Mac: `~/.local/bin/zotero-mcp update-db`
-- Windows: `$HOME\.local\bin\zotero-mcp.exe update-db`
+- Mac: `~/.local/bin/zotero-mcp update-db --fulltext`
+- Windows: `$HOME\.local\bin\zotero-mcp.exe update-db --fulltext`
 
+To force a complete rebuild from scratch (applies new settings to all papers):
+- Mac: `~/.local/bin/zotero-mcp update-db --fulltext --force-rebuild`
+- Windows: `$HOME\.local\bin\zotero-mcp.exe update-db --fulltext --force-rebuild`
 **Don't use `sudo` (Mac) or "Run as Administrator" (Windows).** It's not needed and can cause problems.
 
 **Project links:**
