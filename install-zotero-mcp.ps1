@@ -7,15 +7,51 @@
 #
 # Usage: Right-click > Run with PowerShell, or:
 #   powershell -ExecutionPolicy Bypass -File install-zotero-mcp.ps1
+#   powershell -ExecutionPolicy Bypass -File install-zotero-mcp.ps1 -eugene
 # Press Ctrl+C at any time to quit.
 # =============================================================================
 
+param(
+    [switch]$eugene
+)
+
 $ErrorActionPreference = "Stop"
 
+# --- PS 5.1 compatible helper functions ---
 function Info($msg)    { Write-Host "  [INFO] $msg" -ForegroundColor Cyan }
-function Success($msg) { Write-Host "  `u{2713} $msg" -ForegroundColor Green }
-function Warn($msg)    { Write-Host "  `u{26A0} $msg" -ForegroundColor Yellow }
-function Fail($msg)    { Write-Host "  `u{2717} $msg" -ForegroundColor Red }
+function Success($msg) { Write-Host "  $([char]0x2713) $msg" -ForegroundColor Green }
+function Warn($msg)    { Write-Host "  $([char]0x26A0) $msg" -ForegroundColor Yellow }
+function Fail($msg)    { Write-Host "  $([char]0x2717) $msg" -ForegroundColor Red }
+
+# Helper: Convert PSCustomObject to hashtable (PS 5.1 compatibility)
+function ConvertTo-Hashtable($obj) {
+    if ($null -eq $obj) { return @{} }
+    if ($obj -is [hashtable]) { return $obj }
+    $ht = @{}
+    $obj.PSObject.Properties | ForEach-Object {
+        $val = $_.Value
+        if ($val -is [System.Management.Automation.PSCustomObject]) {
+            $val = ConvertTo-Hashtable $val
+        }
+        $ht[$_.Name] = $val
+    }
+    return $ht
+}
+
+# Helper: Write JSON without BOM (PS 5.1 writes UTF-8 with BOM by default)
+function Write-JsonNoBom($path, $obj) {
+    $json = $obj | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($path, $json, [System.Text.UTF8Encoding]::new($false))
+}
+
+# UX helpers
+function Pause-Script($seconds) { Start-Sleep -Milliseconds ([int]($seconds * 1000)) }
+function Section($title) {
+    Write-Host ""
+    Write-Host "-- $title --" -ForegroundColor Cyan
+    Write-Host ""
+    Pause-Script 0.3
+}
 
 Write-Host ""
 Write-Host "+==========================================================+" -ForegroundColor White
@@ -31,16 +67,17 @@ Write-Host ""
 # STEP 1: Prerequisites
 # ============================================================================
 
-Write-Host "-- Checking Prerequisites --" -ForegroundColor Cyan
-Write-Host ""
+Section "Checking Prerequisites"
 
 # --- Check for Zotero ---
 $ZoteroFound = $false
+$pf86 = ${env:ProgramFiles(x86)}
 $ZoteroPaths = @(
     "$env:ProgramFiles\Zotero\zotero.exe",
-    "${env:ProgramFiles(x86)}\Zotero\zotero.exe",
     "$env:LOCALAPPDATA\Zotero\zotero.exe"
 )
+if ($pf86) { $ZoteroPaths += "$pf86\Zotero\zotero.exe" }
+
 foreach ($p in $ZoteroPaths) {
     if (Test-Path $p) { $ZoteroFound = $true; break }
 }
@@ -116,10 +153,9 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
 # ============================================================================
 
 Write-Host ""
-Write-Host "-- Installation Mode --" -ForegroundColor Cyan
-Write-Host ""
 
 # Defaults
+$SetupMode = "1"
 $ApiKey = ""
 $LibraryId = ""
 $EnableWrite = $false
@@ -136,7 +172,6 @@ if (-not $ZoteroFound) {
     $BuildDb = $false
     $EnableSemantic = $false
     $EnableWrite = $true
-    $SetupMode = "1"
 } else {
     Write-Host "  How would you like to configure the installation?"
     Write-Host ""
@@ -153,20 +188,21 @@ if (-not $ZoteroFound) {
 # --- Advanced mode options ---
 if ($SetupMode -eq "2") {
 
-    Write-Host ""
-    Write-Host "-- Access Mode --" -ForegroundColor Cyan
-    Write-Host ""
+    Section "Access Mode"
     Write-Host "  How should the MCP connect to Zotero?"
     Write-Host ""
     Write-Host "    1) Hybrid (recommended)"
     Write-Host "       Reads from local Zotero (fast), writes via web API"
+    Write-Host "       Requires: Zotero running + API key"
     Write-Host ""
     Write-Host "    2) Local only"
     Write-Host "       Reads from local Zotero, no write operations"
+    Write-Host "       Requires: Zotero running"
     Write-Host ""
     Write-Host "    3) Web API only"
     Write-Host "       Everything through Zotero's cloud API"
-    Write-Host "       Works without Zotero running, but slower and limited"
+    Write-Host "       Works without Zotero running, but slower and limited:"
+    Write-Host "       no semantic search, PDF features, or full-text access"
     Write-Host ""
     $accessChoice = Read-Host "  Enter choice (1/2/3)"
 
@@ -178,10 +214,10 @@ if ($SetupMode -eq "2") {
 
     # Semantic search
     if ($AccessMode -ne "web") {
-        Write-Host ""
-        Write-Host "-- Semantic Search Settings --" -ForegroundColor Cyan
-        Write-Host ""
+        Section "Semantic Search Settings"
         Write-Host "  Semantic search lets you find papers by meaning, not just keywords."
+        Write-Host "  For example: 'papers about the relationship between sleep and memory'"
+        Write-Host ""
         Write-Host "  By default, it uses a small local AI model that runs on your"
         Write-Host "  computer - no tokens or usage limits are consumed."
         Write-Host ""
@@ -198,38 +234,53 @@ if ($SetupMode -eq "2") {
     # PDF indexing
     if ($EnableSemantic) {
         Write-Host ""
-        Write-Host "-- PDF Indexing for Semantic Search --" -ForegroundColor Cyan
+        Write-Host "  How many pages of each PDF should be indexed for search?"
+        Write-Host "  More pages = better search but longer initial build time."
+        Write-Host "  By default, this uses a local model - no tokens or usage"
+        Write-Host "  limits consumed."
         Write-Host ""
-        Write-Host "  How many pages of each PDF should be indexed?"
-        Write-Host "  By default, this uses a local model - no tokens consumed."
-        Write-Host ""
-        Write-Host "    10 pages  - fast build"
-        Write-Host "    20 pages  - moderate"
-        Write-Host "    50 pages  - thorough (recommended)"
+        Write-Host "    10 pages  - fast build, covers abstract + introduction"
+        Write-Host "    20 pages  - moderate, adds some results/discussion"
+        Write-Host "    50 pages  - thorough, covers most of each paper (recommended)"
         Write-Host ""
         $indexInput = Read-Host "  Enter number of pages (default: 50)"
-        if ($indexInput) { $PdfIndexPages = [int]$indexInput }
+        if ($indexInput) {
+            if ($indexInput -match '^\d+$') {
+                $PdfIndexPages = [int]$indexInput
+            } else {
+                Warn "Invalid input '$indexInput'. Using default: 50"
+            }
+        }
     }
 
     # Display pages
     Write-Host ""
-    Write-Host "-- Claude Reading Limit --" -ForegroundColor Cyan
+    Write-Host "  When Claude reads a paper during conversation, how many pages"
+    Write-Host "  should it have access to and read? More pages = better"
+    Write-Host "  understanding but uses more of your Claude usage allowance"
+    Write-Host "  (tokens)."
     Write-Host ""
-    Write-Host "  When Claude reads a paper, how many pages should it have"
-    Write-Host "  access to and read? More pages uses more tokens."
-    Write-Host ""
-    Write-Host "    10 pages  - conservative (recommended)"
+    Write-Host "    10 pages  - conservative, saves usage (recommended)"
     Write-Host "    20 pages  - balanced"
-    Write-Host "    50 pages  - thorough"
+    Write-Host "    50 pages  - thorough, higher token usage"
     Write-Host ""
     $displayInput = Read-Host "  Enter number of pages (default: 10)"
-    if ($displayInput) { $PdfDisplayPages = [int]$displayInput }
+    if ($displayInput) {
+        if ($displayInput -match '^\d+$') {
+            $PdfDisplayPages = [int]$displayInput
+        } else {
+            Warn "Invalid input '$displayInput'. Using default: 10"
+        }
+    }
 
     # Build timing
     if ($EnableSemantic) {
         Write-Host ""
+        Write-Host "  Would you like to build the semantic search database now?"
+        Write-Host "  This is a one-time process that takes 5-15 minutes."
+        Write-Host ""
         Write-Host "  Recommended: Yes"
-        $buildReply = Read-Host "  Build semantic search database now? (Y/n)"
+        $buildReply = Read-Host "  Build now? (Y/n)"
         if ($buildReply -match "^[Nn]") {
             $BuildDb = $false
             Info "You can build it later by re-running this script."
@@ -252,12 +303,14 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
         } catch { }
     }
 
-    Write-Host ""
-    Write-Host "-- Setting up Zotero API Access --" -ForegroundColor Cyan
-    Write-Host ""
+    Section "Setting up Zotero API Access"
 
     if ($ExistingApiKey -and $ExistingLibraryId) {
-        $maskedKey = $ExistingApiKey.Substring(0,4) + "***" + $ExistingApiKey.Substring($ExistingApiKey.Length - 4)
+        if ($ExistingApiKey.Length -ge 8) {
+            $maskedKey = $ExistingApiKey.Substring(0,4) + "***" + $ExistingApiKey.Substring($ExistingApiKey.Length - 4)
+        } else {
+            $maskedKey = "***"
+        }
         Write-Host "  Existing credentials found in your config:"
         Write-Host ""
         Write-Host "    API Key:  $maskedKey"
@@ -269,6 +322,7 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
             $ApiKey = $ExistingApiKey
             $LibraryId = $ExistingLibraryId
             Success "Using existing API credentials"
+            Pause-Script 0.3
         } else {
             Write-Host ""
             Write-Host "  Enter new credentials below."
@@ -278,7 +332,7 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
 
     if (-not $ApiKey) {
         Write-Host "  To enable write operations (adding papers, managing collections,"
-        Write-Host "  updating metadata), you need a Zotero API key."
+        Write-Host "  updating metadata), you'll need a Zotero API key."
         Write-Host ""
         Write-Host "  Note: You'll need to be logged in to Zotero on the web."
         Write-Host "  If you haven't verified your email with Zotero yet, you"
@@ -293,9 +347,9 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
         Write-Host "  2. Click 'Create new private key'"
         Write-Host "  3. Give it a name (e.g., 'Claude MCP')"
         Write-Host "  4. Under 'Personal Library', check ALL of these:"
-        Write-Host "     - Allow library access"
-        Write-Host "     - Allow write access"
-        Write-Host "     - Allow notes access"
+        Write-Host "       - Allow library access"
+        Write-Host "       - Allow write access"
+        Write-Host "       - Allow notes access"
         Write-Host "  5. Click 'Save Key' and copy the key shown"
         Write-Host ""
         $ApiKey = Read-Host "  Enter your Zotero API Key (or press Enter to skip)"
@@ -315,19 +369,22 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
 
             if ($LibraryId) {
                 Success "API credentials captured"
+                Pause-Script 0.3
             } else {
                 Warn "No User ID provided. Configuring local-only mode."
                 $EnableWrite = $false
                 $ApiKey = ""
             }
         } else {
-            Warn "Skipping API key setup. Read-only local mode."
+            Warn "Skipping API key setup."
             $EnableWrite = $false
             if ($AccessMode -eq "web") {
-                Fail "Web API mode requires an API key. Switching to local-only."
+                Fail "Web API mode requires an API key. Switching to local-only mode."
                 $AccessMode = "local"
             }
-            Info "Re-run this script later to add write support."
+            Write-Host ""
+            Info "The MCP will work in read-only local mode."
+            Info "You can re-run this script later to add write support."
         }
     }
 }
@@ -336,9 +393,7 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
 # STEP 3: Install uv
 # ============================================================================
 
-Write-Host ""
-Write-Host "-- Installing Dependencies --" -ForegroundColor Cyan
-Write-Host ""
+Section "Installing Dependencies"
 
 if (Get-Command uv -ErrorAction SilentlyContinue) {
     $uvVer = uv --version 2>$null
@@ -360,23 +415,29 @@ if (Get-Command uv -ErrorAction SilentlyContinue) {
 # STEP 4: Install Zotero MCP Server
 # ============================================================================
 
-Write-Host ""
-Write-Host "-- Installing Zotero MCP Server --" -ForegroundColor Cyan
-Write-Host ""
+Section "Installing Zotero MCP Server"
 Info "Please wait while we download and install the server"
 Info "with all dependencies (may take a minute or two)..."
 Write-Host ""
 
 # Remove old pip version
-try {
-    $pipCheck = pip show zotero-mcp-server 2>$null
-    if ($pipCheck) {
-        Warn "Removing old pip-installed version..."
-        pip uninstall zotero-mcp-server -y 2>$null
-    }
-} catch { }
+if (Get-Command pip -ErrorAction SilentlyContinue) {
+    try {
+        $pipCheck = pip show zotero-mcp-server 2>$null
+        if ($pipCheck) {
+            Warn "Removing old pip-installed version..."
+            pip uninstall zotero-mcp-server -y 2>$null
+        }
+    } catch { }
+}
 
-$InstallPkg = "zotero-mcp-server[all]"
+# Determine install source
+if ($eugene) {
+    $InstallPkg = "zotero-mcp-server[all] @ git+https://github.com/ehawkin/zotero-mcp.git"
+    Info "Installing from Eugene's fork (latest development version)..."
+} else {
+    $InstallPkg = "zotero-mcp-server[all]"
+}
 
 $uvList = uv tool list 2>$null
 if ($uvList -match "zotero-mcp-server") {
@@ -384,15 +445,36 @@ if ($uvList -match "zotero-mcp-server") {
 } else {
     uv tool install $InstallPkg 2>$null
 }
-Success "Zotero MCP server installed"
+
+if ($LASTEXITCODE -ne 0) {
+    Fail "Failed to install Zotero MCP server."
+    Write-Host "   Try running manually: uv tool install $InstallPkg"
+    exit 1
+}
+
+if ($eugene) {
+    Success "Zotero MCP server installed (from Eugene's fork)"
+} else {
+    Success "Zotero MCP server installed"
+}
+Pause-Script 0.5
+
+# Ensure ~/.local/bin is in PATH
+$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 
 # Find executable
 $ZoteroMcpPath = "$env:USERPROFILE\.local\bin\zotero-mcp.exe"
 if (-not (Test-Path $ZoteroMcpPath)) {
-    $ZoteroMcpPath = (Get-Command zotero-mcp -ErrorAction SilentlyContinue).Source
+    $found = Get-Command zotero-mcp -ErrorAction SilentlyContinue
+    if ($found) { $ZoteroMcpPath = $found.Source }
 }
-if (-not $ZoteroMcpPath) {
-    Fail "Could not locate zotero-mcp executable."
+if (-not $ZoteroMcpPath -or -not (Test-Path $ZoteroMcpPath)) {
+    Write-Host ""
+    Fail "Could not locate the zotero-mcp executable."
+    Write-Host ""
+    Write-Host "   This usually means uv installed it in an unexpected location."
+    Write-Host "   Try running: uv tool list"
+    Write-Host "   Or reinstall manually: uv tool install --force $InstallPkg"
     exit 1
 }
 
@@ -400,11 +482,9 @@ if (-not $ZoteroMcpPath) {
 # STEP 5: Configure Claude Desktop
 # ============================================================================
 
-Write-Host ""
-Write-Host "-- Configuring Claude Desktop --" -ForegroundColor Cyan
-Write-Host ""
+Section "Configuring Claude Desktop"
 
-# Back up existing config
+# Back up existing config with timestamp
 if (Test-Path $ClaudeConfigFile) {
     $backupTs = Get-Date -Format "yyyy-MM-dd_HHmm"
     $backupFile = $ClaudeConfigFile -replace "\.json$", "_backup_$backupTs.json"
@@ -412,7 +492,7 @@ if (Test-Path $ClaudeConfigFile) {
     Success "Config backed up to $(Split-Path $backupFile -Leaf)"
 }
 
-# Build config
+# Build environment variables
 $envObj = @{ ZOTERO_LOCAL = "true" }
 if ($AccessMode -eq "web") {
     $envObj = @{}
@@ -423,20 +503,26 @@ if ($EnableWrite -and $ApiKey -and $LibraryId) {
     $envObj["ZOTERO_LIBRARY_TYPE"] = "user"
 }
 
+# Load existing config (PS 5.1 compatible)
 $config = @{}
 if (Test-Path $ClaudeConfigFile) {
     try {
-        $config = Get-Content $ClaudeConfigFile -Raw | ConvertFrom-Json -AsHashtable
+        $raw = Get-Content $ClaudeConfigFile -Raw | ConvertFrom-Json
+        $config = ConvertTo-Hashtable $raw
     } catch { $config = @{} }
 }
 
 if (-not $config.ContainsKey("mcpServers")) { $config["mcpServers"] = @{} }
+if ($config["mcpServers"] -isnot [hashtable]) {
+    $config["mcpServers"] = ConvertTo-Hashtable $config["mcpServers"]
+}
 $config["mcpServers"]["zotero"] = @{
     command = $ZoteroMcpPath
     env = $envObj
 }
 
-$config | ConvertTo-Json -Depth 10 | Set-Content $ClaudeConfigFile -Encoding UTF8
+# Write without BOM
+Write-JsonNoBom $ClaudeConfigFile $config
 
 $modeLabel = switch ($AccessMode) {
     "hybrid" { "hybrid (read + write)" }
@@ -444,29 +530,31 @@ $modeLabel = switch ($AccessMode) {
     "web"    { "web API" }
 }
 Success "Claude Desktop configured for $modeLabel mode"
+Pause-Script 0.5
 
 # ============================================================================
 # STEP 6: Configure Semantic Search
 # ============================================================================
 
 if ($EnableSemantic) {
-    Write-Host ""
-    Write-Host "-- Configuring Semantic Search --" -ForegroundColor Cyan
-    Write-Host ""
+    Section "Configuring Semantic Search"
 
     $semConfigDir = "$env:USERPROFILE\.config\zotero-mcp"
     $semConfigFile = "$semConfigDir\config.json"
     New-Item -ItemType Directory -Path $semConfigDir -Force | Out-Null
 
+    # Load existing config (PS 5.1 compatible)
     $semConfig = @{}
     if (Test-Path $semConfigFile) {
         try {
-            $semConfig = Get-Content $semConfigFile -Raw | ConvertFrom-Json -AsHashtable
+            $raw = Get-Content $semConfigFile -Raw | ConvertFrom-Json
+            $semConfig = ConvertTo-Hashtable $raw
         } catch { $semConfig = @{} }
     }
 
     if (-not $semConfig.ContainsKey("semantic_search")) { $semConfig["semantic_search"] = @{} }
     $ss = $semConfig["semantic_search"]
+    if ($ss -isnot [hashtable]) { $ss = ConvertTo-Hashtable $ss; $semConfig["semantic_search"] = $ss }
     if (-not $ss.ContainsKey("update_config")) { $ss["update_config"] = @{} }
     $ss["update_config"]["auto_update"] = $true
     $ss["update_config"]["update_frequency"] = "startup"
@@ -475,13 +563,12 @@ if ($EnableSemantic) {
     $ss["extraction"]["pdf_max_pages"] = $PdfIndexPages
     $ss["extraction"]["fulltext_display_max_pages"] = $PdfDisplayPages
 
-    $semConfig | ConvertTo-Json -Depth 10 | Set-Content $semConfigFile -Encoding UTF8
+    # Write without BOM
+    Write-JsonNoBom $semConfigFile $semConfig
 
     Success "Auto-update on startup: enabled"
     Success "Full-text indexing: enabled"
     Success "PDF indexing limit: $PdfIndexPages pages"
-    Write-Host ""
-    Write-Host "-- Claude Reading Limit --" -ForegroundColor Cyan
     Write-Host ""
     Success "Display limit: $PdfDisplayPages pages"
 }
@@ -491,9 +578,7 @@ if ($EnableSemantic) {
 # ============================================================================
 
 if ($BuildDb) {
-    Write-Host ""
-    Write-Host "-- Semantic Search Database --" -ForegroundColor Cyan
-    Write-Host ""
+    Section "Semantic Search Database"
 
     $dbPath = "$env:USERPROFILE\.config\zotero-mcp\chroma_db"
     if (Test-Path $dbPath) {
@@ -518,7 +603,7 @@ if ($BuildDb) {
         $connected = $false
         while (-not $connected) {
             try {
-                $testReq = Invoke-WebRequest -Uri "http://127.0.0.1:23119/api/users/0/items?limit=1" -TimeoutSec 2 -ErrorAction Stop
+                Invoke-WebRequest -Uri "http://127.0.0.1:23119/api/users/0/items?limit=1" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop | Out-Null
                 $connected = $true
             } catch {
                 Write-Host ""
@@ -563,6 +648,7 @@ if ($BuildDb) {
                 & $ZoteroMcpPath update-db --fulltext
                 Write-Host ""
                 Success "Semantic search database built"
+                Pause-Script 0.5
             } catch {
                 Write-Host ""
                 Warn "Database build had issues. You can try again later with:"
@@ -576,31 +662,30 @@ if ($BuildDb) {
 # STEP 8: Complete!
 # ============================================================================
 
+Pause-Script 1
+
 Write-Host ""
-Write-Host "+==========================================================+" -ForegroundColor White
-Write-Host "|              " -NoNewline; Write-Host "Installation Complete!" -ForegroundColor Green -NoNewline; Write-Host "                     |" -ForegroundColor White
-Write-Host "+==========================================================+" -ForegroundColor White
-Write-Host "|                                                           |" -ForegroundColor White
-Write-Host "|  To start using Zotero MCP:                              |" -ForegroundColor White
-Write-Host "|                                                           |" -ForegroundColor White
-Write-Host "|  1. Make sure Zotero is running                          |" -ForegroundColor White
-Write-Host "|  2. Open Claude Desktop (restart if already open)        |" -ForegroundColor White
-Write-Host "|  3. Start chatting! Try:                                 |" -ForegroundColor White
-Write-Host "|     'What papers are in my library about [topic]?'       |" -ForegroundColor White
-Write-Host "|                                                           |" -ForegroundColor White
-Write-Host "|  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" -ForegroundColor Red -NoNewline; Write-Host "    |" -ForegroundColor White
-Write-Host "|  >>> " -ForegroundColor Red -NoNewline; Write-Host "IMPORTANT: In Zotero, go to:" -ForegroundColor White -NoNewline; Write-Host "                    <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
-Write-Host "|  >>>   Settings > Advanced" -ForegroundColor Red -NoNewline; Write-Host "                            <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
-Write-Host "|  >>> " -ForegroundColor Red -NoNewline; Write-Host "and make sure this is CHECKED:" -ForegroundColor White -NoNewline; Write-Host "                  <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
-Write-Host "|  >>>   Allow other applications on this computer " -ForegroundColor Red -NoNewline; Write-Host " <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
-Write-Host "|  >>>     to communicate with Zotero" -ForegroundColor Red -NoNewline; Write-Host "                  <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
-Write-Host "|  >>> " -ForegroundColor Red -NoNewline; Write-Host "Without this, the MCP cannot connect!" -ForegroundColor White -NoNewline; Write-Host "           <<<" -ForegroundColor Red -NoNewline; Write-Host "  |" -ForegroundColor White
-Write-Host "|  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" -ForegroundColor Red -NoNewline; Write-Host "    |" -ForegroundColor White
-Write-Host "|                                                           |" -ForegroundColor White
-Write-Host "+==========================================================+" -ForegroundColor White
+Write-Host ""
+Write-Host "  $([char]0x2713) Installation Complete!" -ForegroundColor Green
+Write-Host ""
+Write-Host "  To start using Zotero MCP:"
+Write-Host ""
+Write-Host "  1. Make sure Zotero is running"
+Write-Host "  2. Open Claude Desktop (restart if already open)"
+Write-Host "  3. Start chatting! Try:"
+Write-Host "     'What papers are in my library about [topic]?'"
+Write-Host ""
+Write-Host "  ========================================================" -ForegroundColor Red
+Write-Host "  IMPORTANT:" -ForegroundColor Red -NoNewline; Write-Host " In Zotero, go to:"
+Write-Host "    Edit > Settings > Advanced"
+Write-Host "  and make sure this is " -NoNewline; Write-Host "CHECKED:" -ForegroundColor Red
+Write-Host "    $([char]0x2611) Allow other applications on this computer" -ForegroundColor Cyan
+Write-Host "      to communicate with Zotero" -ForegroundColor Cyan
+Write-Host "  Without this, the MCP cannot connect!" -ForegroundColor Red
+Write-Host "  ========================================================" -ForegroundColor Red
 Write-Host ""
 
-# Setup summary
+# Show setup summary
 if ($EnableWrite -and $ApiKey) {
     Write-Host "  Your setup: " -NoNewline; Write-Host "Hybrid mode (read + write)" -ForegroundColor Green
     Write-Host ""
