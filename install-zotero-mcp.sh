@@ -8,11 +8,20 @@
 # If uv is not installed, the script installs it automatically.
 #
 # Usage: bash install-zotero-mcp.sh
+#        bash install-zotero-mcp.sh -eugene   (install from Eugene's fork)
 # Do NOT run with sudo.
 # Press Ctrl+C at any time to quit.
 # =============================================================================
 
 set -e
+
+# Check for -eugene flag (install from fork instead of official release)
+USE_FORK=false
+for arg in "$@"; do
+    if [[ "$arg" == "-eugene" ]]; then
+        USE_FORK=true
+    fi
+done
 
 # Colors for output
 RED='\033[0;31m'
@@ -497,7 +506,12 @@ if pip3 show zotero-mcp-server &>/dev/null 2>&1; then
     pip3 uninstall zotero-mcp-server -y 2>/dev/null || true
 fi
 
-INSTALL_PKG="zotero-mcp-server[all]"
+if [[ "$USE_FORK" == true ]]; then
+    INSTALL_PKG="zotero-mcp-server[all] @ git+https://github.com/ehawkin/zotero-mcp.git"
+    info "Installing from Eugene's fork (latest development version)..."
+else
+    INSTALL_PKG="zotero-mcp-server[all]"
+fi
 
 if uv tool list 2>/dev/null | grep -q "zotero-mcp-server"; then
     uv tool install --force --reinstall "$INSTALL_PKG" > /dev/null 2>&1 &
@@ -506,7 +520,11 @@ else
 fi
 spin $! "Installing Zotero MCP server..."
 wait $!
-success "Zotero MCP server installed"
+if [[ "$USE_FORK" == true ]]; then
+    success "Zotero MCP server installed (from Eugene's fork)"
+else
+    success "Zotero MCP server installed"
+fi
 pause 0.5
 # Ensure ~/.local/bin is in PATH (uv tool install puts executables here)
 export PATH="$HOME/.local/bin:$PATH"
