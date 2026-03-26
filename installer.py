@@ -24,6 +24,13 @@ except ImportError:
     import webview
 
 
+# Enrich PATH — macOS GUI apps don't inherit shell PATH
+for _p in [os.path.expanduser("~/.local/bin"), os.path.expanduser("~/.cargo/bin"),
+           "/opt/homebrew/bin", "/usr/local/bin"]:
+    if _p not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
+
+
 class InstallerAPI:
     def __init__(self):
         self.window = None
@@ -48,7 +55,9 @@ class InstallerAPI:
             results["claude"] = os.path.isdir(
                 os.path.join(os.environ.get("APPDATA", ""), "Claude"))
         results["git"] = shutil.which("git") is not None
-        results["uv"] = shutil.which("uv") is not None
+        results["uv"] = (shutil.which("uv") is not None
+                         or os.path.isfile(os.path.expanduser("~/.local/bin/uv"))
+                         or os.path.isfile(os.path.expanduser("~/.cargo/bin/uv")))
         results["existing_credentials"] = self._get_existing_credentials()
         return results
 
@@ -399,21 +408,10 @@ input:focus,select:focus{border-color:#D8D0C0}
 <!-- S2: API Credentials -->
 <div class="screen" id="screen-2">
   <div class="card">
-    <h2>Zotero API Access <button class="info-btn" onclick="toggleInfo()">i</button></h2>
+    <h2>Zotero API Access</h2>
     <p>A free API key enables write operations — adding papers, managing collections, and more.</p>
 
-    <div id="info-panel" class="info-panel hidden">
-      <strong>How to get your API key:</strong><br>
-      1. Go to <span class="link" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span><br>
-      2. You may need to log in first. If you haven’t verified your email, do that too.<br>
-      3. Click “Create new private key”<br>
-      4. Name it (e.g., “Claude MCP”)<br>
-      5. Under “Personal Library”, check: Allow library access, Allow write access, Allow notes access<br>
-      6. Click “Save Key” and copy the key<br><br>
-      <strong>Your User ID</strong> is the number labeled “Your userID for use in API calls” on the same page — it’s NOT your username.
-    </div>
-
-    <div id="cred-existing" class="hidden">
+    <div id=”cred-existing” class=”hidden”>
       <div class="cred-box">
         <strong>Existing credentials found in your config file:</strong><br>
         API Key: <span id="ex-key"></span><br>
@@ -430,7 +428,19 @@ input:focus,select:focus{border-color:#D8D0C0}
       <input type="text" id="api-key" placeholder="Paste API key...">
       <label>User ID</label>
       <input type="text" id="library-id" placeholder="Numeric user ID">
-      <p class="hint">Find this at <span class="link" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span></p>
+      <p class="hint" style="margin-top:8px">You can find this at <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span> <button class="info-btn" onclick="toggleInfo()">i</button></p>
+      <div id="info-panel" class="info-panel hidden">
+        <strong>How to get your API key:</strong><br>
+        1. Go to <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span><br>
+        2. You may need to log in first. If you haven't verified your email, do that too.<br>
+        3. Click "Create new private key"<br>
+        4. Name it (e.g., "Claude MCP")<br>
+        5. Under "Personal Library", check: Allow library access, Allow write access, Allow notes access<br>
+        6. Click "Save Key" and copy the key<br><br>
+        <strong>How to find your User ID:</strong><br>
+        1. Go to <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span><br>
+        2. Your User ID is the number labeled "Your userID for use in API calls" — it's NOT your username.
+      </div>
     </div>
   </div>
   <div class="nav-row">
@@ -548,7 +558,7 @@ function toggleCreds(mode){credMode=mode;
   }
 }
 
-function toggleInfo(){document.getElementById('info-panel').classList.toggle('hidden')}
+function toggleInfo(){var p=document.getElementById('info-panel');p.classList.toggle('hidden');if(!p.classList.contains('hidden'))setTimeout(function(){p.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}
 
 function startInstall(){
   var key=document.getElementById('api-key').value.trim();
