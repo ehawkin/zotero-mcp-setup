@@ -6,13 +6,13 @@
 
 ### Easy Visual Installer for Mac
 
-One command launches a guided setup wizard with a visual interface — no manual configuration needed:
+**[Download the Mac Installer (DMG)](https://github.com/ehawkin/zotero-mcp-setup/releases/latest/download/ZoteroMCPSetup-mac.dmg)** — a signed and notarized app that walks you through the entire setup with a visual interface. No Terminal needed.
+
+Alternatively, if you prefer a one-liner in Terminal:
 
 ```
 curl -sL https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/zotero-mcp-installer.py -o /tmp/zotero-mcp-installer.py && python3 /tmp/zotero-mcp-installer.py
 ```
-
-Open **Terminal** (Command + Space, type "Terminal", hit Enter), paste the command above, and press Enter. The wizard walks you through everything.
 
 *If you're on Windows, or prefer a non-visual setup, see the instructions below.*
 
