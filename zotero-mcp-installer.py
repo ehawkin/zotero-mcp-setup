@@ -213,7 +213,7 @@ class InstallerAPI:
             with open(sem_file, "w") as f:
                 json.dump(sem, f, indent=2)
                 f.write("\n")
-            self._log(f"Search: index {pdf_index}pp, display {pdf_display}pp", "success")
+            self._log(f"Search: index {pdf_index} pages, display {pdf_display} pages", "success")
 
             # Step 5: Database
             if build_db:
@@ -247,18 +247,18 @@ HTML = r"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Athiti:wght@500;600&family=Ysabeau+Office:wght@400;500;600&display=swap" media="print" onload="this.media='all'"" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Athiti:wght@500;600&family=Ysabeau+Office:wght@400;500;600&display=swap" media="print" onload="this.media='all'" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Ysabeau Office',-apple-system,sans-serif;background:#FEFBF6;color:#20262E;
-  min-height:100vh;display:flex;justify-content:center;padding:20px 16px}
+  min-height:100vh;display:flex;justify-content:center;padding:14px 16px}
 .container{max-width:540px;width:100%}
-.header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.header{display:flex;align-items:center;gap:14px;margin-bottom:10px}
 .header img{width:56px;height:56px;border-radius:12px}
 .header-text h1{font-family:'Athiti',sans-serif;font-weight:600;font-size:22px}
 .header-text p{font-size:12.5px;color:rgba(32,38,46,.45)}
-.card{background:#fff;border:1px solid rgba(32,38,46,.07);border-radius:13px;padding:22px;
-  margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
+.card{background:#fff;border:1px solid rgba(32,38,46,.07);border-radius:13px;padding:16px 20px;
+  margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
 .card h2{font-family:'Athiti',sans-serif;font-weight:600;font-size:16px;margin-bottom:10px}
 .card p{font-size:13px;color:rgba(32,38,46,.6);line-height:1.6;margin-bottom:8px}
 .prereq-row{display:flex;align-items:center;padding:5px 0;font-size:13px}
@@ -304,7 +304,7 @@ input:focus,select:focus{border-color:#D8D0C0}
 .check-row input{margin-right:7px;accent-color:#20262E}
 .cred-box{background:#F5F1ED;border-radius:7px;padding:12px;margin-bottom:10px;font-size:12.5px;line-height:1.6}
 .cred-box strong{font-weight:600}
-.step-dots{display:flex;justify-content:center;gap:6px;margin-bottom:16px}
+.step-dots{display:flex;justify-content:center;gap:6px;margin-bottom:10px}
 .step-dot{width:7px;height:7px;border-radius:50%;background:rgba(32,38,46,.1);transition:all .3s}
 .step-dot.active{background:#FECF75;width:18px;border-radius:4px}
 .step-dot.done{background:#BECEC5}
@@ -354,7 +354,7 @@ input:focus,select:focus{border-color:#D8D0C0}
 <div class="header">
   <img src="data:image/png;base64,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" alt="Zotero MCP">
   <div class="header-text">
-    <h1>Zotero MCP Setup</h1>
+    <h1>Zotero MCP Setup <span style="font-size:11px;color:rgba(0,0,0,0.3);font-weight:400">(build 0326-R)</span></h1>
     <p>Connect your Zotero library to Claude</p>
   </div>
 </div>
@@ -432,8 +432,8 @@ input:focus,select:focus{border-color:#D8D0C0}
       <strong>This installer:</strong> <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://github.com/ehawkin/zotero-mcp-setup')">github.com/ehawkin/zotero-mcp-setup</span>
     </div>
   </div>
-  <div class="important" style="margin-bottom:12px">
-    <strong>Required Zotero setting:</strong> In Zotero, go to <strong>Settings &rarr; Advanced</strong> and make sure this is checked:<br>
+  <div class="important" style="margin-bottom:8px;padding:10px 14px">
+    <strong><u>Required Zotero setting:</u></strong> In Zotero, go to <strong>Settings &rarr; Advanced</strong> and make sure this is checked:<br>
     <strong>&check; Allow other applications on this computer to communicate with Zotero</strong>
   </div>
   <div class="card">
@@ -474,7 +474,7 @@ input:focus,select:focus{border-color:#D8D0C0}
     <h2>Zotero API Access</h2>
     <p>A free API key enables write operations — adding papers, managing collections, and more.</p>
 
-    <div id=”cred-existing” class=”hidden”>
+    <div id="cred-existing" class="hidden">
       <div class="cred-box">
         <strong>Existing credentials found in your config file:</strong><br>
         API Key: <span id="ex-key"></span><br>
@@ -486,12 +486,8 @@ input:focus,select:focus{border-color:#D8D0C0}
       </div>
     </div>
 
-    <div id="cred-fields" class="hidden">
-      <label>API Key <span style="color:rgba(32,38,46,.25)">(leave blank for read-only mode)</span></label>
-      <input type="text" id="api-key" placeholder="Paste API key...">
-      <label>User ID</label>
-      <input type="text" id="library-id" placeholder="Paste numeric user ID...">
-      <p class="hint" style="margin-top:8px">You can find this at <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span> <button class="info-btn" onclick="toggleInfo()">i</button></p>
+    <div id="cred-fields">
+      <p class="hint" style="margin-bottom:8px">You can find this at <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span> <button class="info-btn" onclick="toggleInfo()">i</button></p>
       <div id="info-panel" class="info-panel hidden">
         <strong>How to get your API key:</strong><br>
         1. Go to <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span><br>
@@ -504,6 +500,10 @@ input:focus,select:focus{border-color:#D8D0C0}
         1. Go to <span class="link" style="color:#20262E" onclick="pywebview.api.open_url('https://www.zotero.org/settings/keys')">zotero.org/settings/keys</span><br>
         2. Your User ID is the number labeled "Your userID for use in API calls" — it's NOT your username.
       </div>
+      <label>API Key <span style="color:rgba(32,38,46,.25)">(leave blank for read-only mode)</span></label>
+      <input type="text" id="api-key" placeholder="Paste API key...">
+      <label>User ID</label>
+      <input type="text" id="library-id" placeholder="Paste numeric user ID...">
     </div>
   </div>
   <div class="nav-row">
@@ -557,40 +557,11 @@ input:focus,select:focus{border-color:#D8D0C0}
   <div class="card">
     <div id="complete-box"></div>
   </div>
-  <div class=”important hidden” id=”guide-zotero-setting” style=”margin-bottom:12px”>
-    <strong>Required Zotero setting:</strong> In Zotero, go to <strong>Settings &rarr; Advanced</strong> and make sure this is checked:<br>
-    <strong>&check; Allow other applications on this computer to communicate with Zotero</strong>
-  </div>
-  <div class=”card hidden” id=”guide-card”>
-    <h2>Getting Started</h2>
-    <p style=”font-size:13px;color:rgba(32,38,46,.6)”>1. Make sure Zotero is open<br>2. Open Claude Desktop (restart if already open)<br>3. Start chatting about your papers!</p>
-    <div class=”separator”></div>
-    <p class=”expand-link” onclick=”togglePanel('g-use-panel')”><span class=”arrow” id=”g-use-arrow”>&#9654;</span> How to use Claude with Zotero</p>
-    <div id=”g-use-panel” class=”info-panel hidden”>
-      Just ask Claude any questions about your library, or ask it to make changes.<br><br>
-      <em>Note: You may briefly see a “response could not be fully generated” message when Claude is adding papers or downloading PDFs. This is normal - just wait a few seconds.</em>
-    </div>
-    <p class=”expand-link” onclick=”togglePanel('g-ex-panel')”><span class=”arrow” id=”g-ex-arrow”>&#9654;</span> Example prompts</p>
-    <div id=”g-ex-panel” class=”info-panel hidden”>
-      • “Search my library for papers about mindfulness interventions”<br>
-      • “What papers do I have by Kingston et al.?”<br>
-      • “Add this paper by DOI: 10.1038/nature12373”<br>
-      • “Create a collection called 'Thesis Chapter 3'”<br>
-      • “Find duplicates and merge them”<br>
-      • “Highlight the key findings in the Wang 2025 paper”<br>
-      • “What are the three most seminal papers on Predictive Coding? Locate them and create a collection.”
-    </div>
-    <p class=”expand-link” onclick=”togglePanel('g-usage-panel')”><span class=”arrow” id=”g-usage-arrow”>&#9654;</span> Claude usage limit tips</p>
-    <div id=”g-usage-panel” class=”info-panel hidden”>
-      Having Claude read full papers uses significant Claude allowance. Search by topic rather than reading whole papers. Tell Claude what you need specifically. Start new conversations when switching tasks.<br><br>
-      Use Sonnet for simple tasks (finding, extracting, summarizing). Use Opus for critical analysis and synthesis.
-    </div>
-  </div>
 </div>
 </div>
 
 <script>
-let cur=0,selectedMode='default',useExKey='',useExId='',credMode='existing';
+let cur=0,selectedMode='default',useExKey='',useExId='',credMode='new';
 
 function goTo(n){
   document.getElementById('screen-'+cur).classList.remove('active');
@@ -605,6 +576,10 @@ function selectMode(m){selectedMode=m;
   document.getElementById('opt-advanced').classList.toggle('selected',m==='advanced')}
 
 function goToAfterMode(){goTo(2)}
+
+document.addEventListener('click',function(e){
+  var el=e.target.closest('[data-panel]');
+  if(el)togglePanel(el.getAttribute('data-panel'))});
 
 function continueFromCreds(){
   if(credMode==='existing' && useExKey){
@@ -629,18 +604,20 @@ function toggleCreds(mode){credMode=mode;
   if(mode==='existing'){
     document.getElementById('api-key').value=useExKey;
     document.getElementById('library-id').value=useExId;
-    document.getElementById('cred-fields').classList.add('hidden');
+    document.getElementById('cred-fields').style.display='none';
   }else{
     document.getElementById('api-key').value='';
     document.getElementById('library-id').value='';
-    document.getElementById('cred-fields').classList.remove('hidden');
+    document.getElementById('cred-fields').style.display='block';
   }
 }
 
-function togglePanel(id){var p=document.getElementById(id);p.classList.toggle('hidden');
+function togglePanel(id){var p=document.getElementById(id);if(!p)return;
+  var wasHidden=p.classList.contains('hidden')||p.style.display==='none';
+  if(wasHidden){p.classList.remove('hidden');p.style.display=''}else{p.classList.add('hidden');p.style.display='none'}
   var arrowId=id.replace('-panel','-arrow');var a=document.getElementById(arrowId);
-  if(a)a.classList.toggle('open',!p.classList.contains('hidden'));
-  if(!p.classList.contains('hidden'))setTimeout(function(){p.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}
+  if(a)a.classList.toggle('open',wasHidden);
+  if(wasHidden)setTimeout(function(){p.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}
 function toggleInfo(){togglePanel('info-panel')}
 
 function startInstall(){
@@ -664,9 +641,20 @@ function showComplete(ok,msg){goTo(5);const b=document.getElementById('complete-
     '<p style="font-size:13px;color:rgba(32,38,46,.6)">Restart Claude Desktop and start chatting!</p>'+
     '<div class="important"><strong>Important:</strong> In Zotero, go to <strong>Settings → Advanced</strong> '+
     'and check:<br><br><strong>☑ Allow other applications on this computer to communicate with Zotero</strong>'+
-    '<br><br>Without this, the MCP cannot connect.</div>';
-    document.getElementById('guide-card').classList.remove('hidden');
-    document.getElementById('guide-zotero-setting').classList.remove('hidden')}
+    '<br><br>Without this, the MCP cannot connect.</div>'+
+    '<div class="separator" style="margin:16px 0"></div>'+
+    '<h3 style="margin:0 0 8px 0;font-size:15px">Getting Started</h3>'+
+    '<p style="font-size:13px;color:rgba(32,38,46,.6);margin:0 0 12px 0">1. Make sure Zotero is open<br>2. Open Claude Desktop (restart if already open)<br>3. Start chatting about your papers!</p>'+
+    '<p class="expand-link" data-panel="g-use-panel"><span class="arrow" id="g-use-arrow">&#9654;</span> How to use Claude with Zotero</p>'+
+    '<div id="g-use-panel" class="info-panel" style="display:none">1. Make sure Zotero is open on your computer<br>2. Just ask Claude any questions about your library, or ask it to make changes<br><br><em>Note: You may briefly see a &#8220;response could not be fully generated&#8221; message when Claude is adding papers or downloading PDFs. This is normal &#8211; just wait a few seconds and it will complete.</em></div>'+
+    '<p class="expand-link" data-panel="g-ex-panel"><span class="arrow" id="g-ex-arrow">&#9654;</span> Example prompts</p>'+
+    '<div id="g-ex-panel" class="info-panel" style="display:none"><strong>Search and read:</strong><br>&#8226; &#8220;Search my library for papers about mindfulness interventions&#8221;<br>&#8226; &#8220;What papers do I have by Kingston et al.?&#8221;<br>&#8226; &#8220;Show me the abstract for that paper about sleep and memory&#8221;<br>&#8226; &#8220;Read the full text and summarize the methodology&#8221;<br>&#8226; &#8220;Find papers related to this paragraph I&#39;m writing: [paste text]&#8221;<br><br><strong>Add and organize:</strong><br>&#8226; &#8220;Add this paper by DOI: 10.1038/nature12373&#8221;<br>&#8226; &#8220;Add this arXiv paper: https://arxiv.org/abs/1706.03762&#8221;<br>&#8226; &#8220;Create a collection called Thesis Chapter 3&#8221;<br>&#8226; &#8220;Tag all my papers about CBT with CBT&#8221;<br>&#8226; &#8220;Find duplicate papers and merge them&#8221;<br><br><strong>Multi-step requests:</strong><br>&#8226; &#8220;What are the three most seminal papers on Predictive Coding? Locate them and create a collection.&#8221;<br>&#8226; &#8220;Highlight in green any key findings in the Wang 2025 paper&#8221;<br>&#8226; &#8220;Go through this collection and add a summary note to each paper&#8221;</div>'+
+    '<p class="expand-link" data-panel="g-pdf-panel"><span class="arrow" id="g-pdf-arrow">&#9654;</span> About adding PDFs</p>'+
+    '<div id="g-pdf-panel" class="info-panel" style="display:none">When you ask Claude to add papers to your library, it attempts to attach open-access PDFs automatically. For paywalled papers, you may need to connect to your university VPN, then in Zotero right-click the item and select &#8220;Find Available PDF&#8221;, or download and import them manually.</div>'+
+    '<p class="expand-link" data-panel="g-usage-panel"><span class="arrow" id="g-usage-arrow">&#9654;</span> Claude usage limit tips</p>'+
+    '<div id="g-usage-panel" class="info-panel" style="display:none">Having Claude read the full text of papers may use a significant portion of your Claude usage allowance. A single paper can use 10,000+ tokens, and that cost compounds with every subsequent message.<br><br><strong>Tips to conserve usage:</strong><br>&#8226; Ask Claude to search by topic rather than reading whole papers<br>&#8226; Tell Claude what you need rather than asking it to read everything<br>&#8226; Start new conversations when switching tasks<br><br><strong>For simpler tasks</strong> (finding papers, extracting numbers, summarizing), consider using a lighter model like Claude Sonnet.<br><br><strong>Use more powerful models like Claude Opus</strong> for critically evaluating methodology, synthesizing across papers, identifying contradictions, and generating novel arguments.</div>'+
+    '<p class="expand-link" data-panel="g-tech-panel"><span class="arrow" id="g-tech-arrow">&#9654;</span> Technical details</p>'+
+    '<div id="g-tech-panel" class="info-panel" style="display:none"><strong>Privacy:</strong> Searches happen locally between Claude Desktop and Zotero on your machine. Write operations go through Zotero&#39;s secure cloud API (the same sync system Zotero already uses).<br><br><strong>Two kinds of search:</strong> Basic search (title, author, keyword) works instantly. Semantic search (by meaning) uses a local AI model and a search index that auto-refreshes on startup.<br><br><strong>Manual index update:</strong> If you prefer to update the search index yourself, you can run this in Terminal:<br><code>~/.local/bin/zotero-mcp update-db --fulltext</code><br><br>You can also force a complete rebuild from scratch (applies new settings to all papers):<br><code>~/.local/bin/zotero-mcp update-db --fulltext --force-rebuild</code></div>'}
   else{b.innerHTML='<h2 style="color:#9a3030">Setup Failed</h2>'+
     '<p style="font-size:13px;color:rgba(32,38,46,.6)">'+msg+'</p>'+
     '<div style="margin-top:12px"><button class="btn btn-outline" onclick="location.reload()">Try Again</button></div>'}
@@ -687,18 +675,23 @@ window.addEventListener('pywebviewready',function(){
       d.innerHTML='<div class="prereq-dot '+cls+'">'+ico+'</div><span>'+it.n+ex+'</span>';
       l.appendChild(d)});
     document.getElementById('btn-start').disabled=false;
-    if(r.existing_credentials){useExKey=r.existing_credentials.raw_key||'';
+    var credBox=document.getElementById('cred-existing');
+    var credFields=document.getElementById('cred-fields');
+    if(r.existing_credentials && r.existing_credentials.raw_key && r.existing_credentials.library_id){
+      useExKey=r.existing_credentials.raw_key;
       useExId=r.existing_credentials.library_id;
-      document.getElementById('ex-key').textContent=useExKey;
+      credMode='existing';
+      document.getElementById('ex-key').textContent=r.existing_credentials.masked_key||useExKey;
       document.getElementById('ex-id').textContent=useExId;
-      document.getElementById('cred-existing').classList.remove('hidden');
-      document.getElementById('cred-fields').classList.add('hidden');
+      credBox.style.display='block';
+      credFields.style.display='none';
       document.getElementById('api-key').value=useExKey;
       document.getElementById('library-id').value=useExId}
     else{
-      // No existing credentials — show the entry fields
       credMode='new';
-      document.getElementById('cred-fields').classList.remove('hidden')}
+      credBox.style.display='none';
+      credFields.style.display='block';
+}
   })
 })
 </script>
