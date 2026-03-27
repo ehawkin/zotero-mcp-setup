@@ -10,7 +10,7 @@ No terminal commands needed — just download, open, and follow the wizard:
 
 **[Download Zotero MCP Setup for Mac](https://github.com/ehawkin/zotero-mcp-setup/releases/download/v1.1.0/ZoteroMCPSetup-mac.dmg)** (17MB)
 
-Open the disk image and double-click "Zotero MCP Setup" to start. The app walks you through everything with a visual interface.
+Open the disk image, drag "Zotero MCP Setup" to your Applications folder, then right-click it and choose **Open**. (macOS may warn you the first time since the app isn't from the App Store — click "Open" to proceed. If you don't see an "Open" button, go to **System Settings > Privacy & Security** and click "Open Anyway".)
 
 *If you prefer using the terminal, or you're on Windows, see the instructions below.*
 
