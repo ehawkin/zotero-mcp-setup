@@ -4,15 +4,17 @@
 
 ---
 
-### New: Easy Installer App for Mac
+### Easy Visual Installer for Mac
 
-No terminal commands needed — just download, open, and follow the wizard:
+One command launches a guided setup wizard with a visual interface — no manual configuration needed:
 
-**[Download Zotero MCP Setup for Mac](https://github.com/ehawkin/zotero-mcp-setup/releases/download/v1.1.0/ZoteroMCPSetup-mac.dmg)** (17MB)
+```
+curl -sL https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/zotero-mcp-installer.py -o /tmp/zotero-mcp-installer.py && python3 /tmp/zotero-mcp-installer.py
+```
 
-Open the disk image, drag "Zotero MCP Setup" to your Applications folder, then right-click it and choose **Open**. (macOS may warn you the first time since the app isn't from the App Store — click "Open" to proceed. If you don't see an "Open" button, go to **System Settings > Privacy & Security** and click "Open Anyway".)
+Open **Terminal** (Command + Space, type "Terminal", hit Enter), paste the command above, and press Enter. The wizard walks you through everything.
 
-*If you prefer using the terminal, or you're on Windows, see the instructions below.*
+*If you're on Windows, or prefer a non-visual setup, see the instructions below.*
 
 ---
 
