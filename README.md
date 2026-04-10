@@ -6,7 +6,7 @@
 
 ### Easy Visual Installer for Mac
 
-**[Download the Mac Installer (DMG)](https://github.com/ehawkin/zotero-mcp-setup/releases/latest/download/ZoteroMCPSetup-mac.dmg)** — a signed and notarized app that walks you through the entire setup with a visual interface. No Terminal needed.
+**[Download the Mac Installer (DMG)](https://github.com/ehawkin/zotero-mcp-setup/releases/latest/download/ZoteroMCPSetup.dmg)** — a signed and notarized app that walks you through the entire setup with a visual interface. No Terminal needed.
 
 Alternatively, if you prefer a one-liner in Terminal:
 
