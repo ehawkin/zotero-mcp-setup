@@ -190,6 +190,7 @@ $BuildDb = $true
 $EnableSemantic = $true
 $PdfIndexPages = 50
 $PdfDisplayPages = 10
+$AnnotationLimit = $null
 
 # If Zotero not found, force web API mode
 if (-not $ZoteroFound) {
@@ -296,6 +297,27 @@ if ($SetupMode -eq "2") {
             $PdfDisplayPages = [int]$displayInput
         } else {
             Warn "Invalid input '$displayInput'. Using default: 10"
+        }
+    }
+
+    # Annotation limit (Eugene's fork only)
+    if ($eugene) {
+        Write-Host ""
+        Write-Host "  Maximum annotations returned per query."
+        Write-Host "  Controls how many annotations Claude can retrieve at once."
+        Write-Host "  Higher values = more context but uses more of the conversation window."
+        Write-Host ""
+        Write-Host "    Range: 1-1000  |  Default: 300"
+        Write-Host ""
+        $annoInput = Read-Host "  Enter annotation limit (default: 300)"
+        if ($annoInput) {
+            if ($annoInput -match '^\d+$' -and [int]$annoInput -ge 1 -and [int]$annoInput -le 1000) {
+                if ([int]$annoInput -ne 300) {
+                    $AnnotationLimit = [int]$annoInput
+                }
+            } else {
+                Warn "Invalid input '$annoInput'. Using default: 300"
+            }
         }
     }
 
@@ -589,6 +611,9 @@ if ($EnableWrite -and $ApiKey -and $LibraryId) {
     $envObj["ZOTERO_API_KEY"] = $ApiKey
     $envObj["ZOTERO_LIBRARY_ID"] = $LibraryId
     $envObj["ZOTERO_LIBRARY_TYPE"] = "user"
+}
+if ($null -ne $AnnotationLimit) {
+    $envObj["ZOTERO_MCP_ANNOTATION_LIMIT"] = "$AnnotationLimit"
 }
 
 $modeLabel = switch ($AccessMode) {

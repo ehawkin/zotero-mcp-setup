@@ -244,6 +244,7 @@ BUILD_SEMANTIC_DB="yes"
 ENABLE_SEMANTIC_SEARCH="yes"
 PDF_INDEX_PAGES="50"
 PDF_DISPLAY_PAGES="10"
+ANNOTATION_LIMIT=""
 
 # If Zotero not found, force web API mode
 if [[ "$ZOTERO_FOUND" == false ]]; then
@@ -356,6 +357,27 @@ if [[ "$SETUP_MODE" == "2" ]]; then
     if ! [[ "$PDF_DISPLAY_PAGES" =~ ^[0-9]+$ ]]; then
         warn "Invalid input '$PDF_DISPLAY_PAGES'. Using default: 10"
         PDF_DISPLAY_PAGES="10"
+    fi
+
+    # Annotation limit (Eugene's fork only)
+    if [[ "$USE_FORK" == true ]]; then
+        echo ""
+        echo "  Maximum annotations returned per query."
+        echo "  Controls how many annotations Claude can retrieve at once."
+        echo "  Higher values = more context but uses more of the conversation window."
+        echo ""
+        echo "    Range: 1-1000  |  Default: 300"
+        echo ""
+        read -p "  Enter annotation limit (default: 300): " ANNOTATION_INPUT
+        if [[ -n "$ANNOTATION_INPUT" ]]; then
+            if [[ "$ANNOTATION_INPUT" =~ ^[0-9]+$ ]] && (( ANNOTATION_INPUT >= 1 && ANNOTATION_INPUT <= 1000 )); then
+                if [[ "$ANNOTATION_INPUT" != "300" ]]; then
+                    ANNOTATION_LIMIT="$ANNOTATION_INPUT"
+                fi
+            else
+                warn "Invalid input. Using default: 300"
+            fi
+        fi
     fi
 
     # Semantic DB build timing
@@ -659,6 +681,9 @@ else
     ENV_DICT="{'ZOTERO_LOCAL': 'true'"
     if [[ -n "$ENABLE_WRITE_SUPPORT" ]] && [[ -n "$ZOTERO_API_KEY" ]] && [[ -n "$ZOTERO_LIBRARY_ID" ]]; then
         ENV_DICT="$ENV_DICT, 'ZOTERO_API_KEY': '$ZOTERO_API_KEY', 'ZOTERO_LIBRARY_ID': '$ZOTERO_LIBRARY_ID', 'ZOTERO_LIBRARY_TYPE': 'user'"
+    fi
+    if [[ -n "$ANNOTATION_LIMIT" ]]; then
+        ENV_DICT="$ENV_DICT, 'ZOTERO_MCP_ANNOTATION_LIMIT': '$ANNOTATION_LIMIT'"
     fi
     ENV_DICT="$ENV_DICT}"
 fi

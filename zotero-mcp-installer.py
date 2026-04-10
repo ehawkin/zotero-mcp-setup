@@ -14,7 +14,6 @@ import subprocess
 import sys
 import threading
 import time
-import webbrowser
 
 try:
     import webview
@@ -30,6 +29,7 @@ for _p in [os.path.expanduser("~/.local/bin"), os.path.expanduser("~/.cargo/bin"
         os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
 
 INSTALLER_SCRIPT_VERSION = "1.1.0"
+INSTALLER_GUI_VERSION = "0409"
 
 
 HTML = r"""<!DOCTYPE html>
@@ -374,6 +374,12 @@ input:focus,select:focus{border-color:#D8D0C0}
       <option value="50">50 — thorough</option>
     </select>
     <p class="hint">More pages = better understanding but uses more Claude allowance.</p>
+    <div id="annotation-limit-section" style="display:none">
+      <label>Maximum annotations per query</label>
+      <input type="number" id="annotation-limit" value="300" min="1" max="1000" step="1">
+      <p class="hint">Controls how many annotations Claude can retrieve at once. Most users should leave this at 300. <button class="info-btn" onclick="togglePanel('annotation-info')">?</button></p>
+      <div id="annotation-info" class="info-panel hidden">Higher values let Claude see more annotations per request but use more of the conversation's context window. If you have a large annotated library and want Claude to access more at once, increase this. If you're on a plan with smaller context limits, consider lowering it.</div>
+    </div>
     <div class="separator"></div>
     <h2 style="font-size:14px">Search Database</h2>
     <p>Building the database indexes your papers for semantic search (finding papers by meaning). This is a one-time process that takes 5-15 minutes. After that, it updates automatically.</p>
@@ -483,7 +489,9 @@ function toggleSecretMode(){
   if(!secretDatesLoaded){fetchSecretDates();secretDatesLoaded=true}
 }
 function closeSecretMode(){document.getElementById('secret-overlay').classList.remove('active')}
-function onSecretToggle(checked){secretModeEnabled=checked}
+function onSecretToggle(checked){secretModeEnabled=checked;
+  var als=document.getElementById('annotation-limit-section');
+  if(als) als.style.display=checked?'':'none'}
 
 function fetchSecretDates(){
   fetch('https://api.github.com/repos/ehawkin/zotero-mcp/branches/secret')
@@ -509,7 +517,9 @@ function fetchSecretDates(){
         document.getElementById('secret-identical').style.display='block';
         secretModeEnabled=false;
         var cb=document.getElementById('secret-mode-cb');
-        if(cb)cb.checked=false}
+        if(cb)cb.checked=false;
+        var als=document.getElementById('annotation-limit-section');
+        if(als) als.style.display='none'}
       else{
         document.getElementById('secret-content').style.display='block'}
     }).catch(function(){
@@ -531,6 +541,8 @@ function goTo(n){
   if(tb)tb.style.display=(n===0)?'':'none';
   var eh=document.querySelector('.eh-logo-btn');
   if(eh)eh.style.display=(n===0)?'':'none';
+  if(n===3){var als=document.getElementById('annotation-limit-section');
+    if(als) als.style.display=secretModeEnabled?'':'none'}
   if(n===4)startInstall();
   if(n===6)runDiagnostics();
 }
@@ -588,11 +600,14 @@ function startInstall(){
   var key=document.getElementById('api-key').value.trim();
   var lid=document.getElementById('library-id').value.trim();
   if(credMode==='existing' && useExKey){key=useExKey;lid=useExId}
+  var annoEl=document.getElementById('annotation-limit');
+  var annoVal=(secretModeEnabled&&annoEl&&parseInt(annoEl.value)!==300)?parseInt(annoEl.value):null;
   pywebview.api.install({api_key:key,library_id:lid,
     pdf_index_pages:parseInt(document.getElementById('pdf-index').value),
     pdf_display_pages:parseInt(document.getElementById('pdf-display').value),
     build_db:document.getElementById('build-db').checked,
-    use_secret:secretModeEnabled})
+    use_secret:secretModeEnabled,
+    annotation_limit:annoVal})
 }
 
 function addLog(m,l){const a=document.getElementById('log-area'),d=document.createElement('div');
@@ -780,6 +795,7 @@ window.addEventListener('pywebviewready',function(){
 </body></html>"""
 
 
+
 class InstallerAPI:
     def __init__(self):
         self.window = None
@@ -879,6 +895,7 @@ class InstallerAPI:
             pdf_display = config.get("pdf_display_pages", 10)
             build_db = config.get("build_db", True)
             use_secret = config.get("use_secret", False)
+            annotation_limit = config.get("annotation_limit", None)
 
             # Step 1: uv
             self._set_progress(1)
@@ -1010,6 +1027,8 @@ class InstallerAPI:
                 env_vars.update({"ZOTERO_API_KEY": api_key,
                                  "ZOTERO_LIBRARY_ID": library_id,
                                  "ZOTERO_LIBRARY_TYPE": "user"})
+            if use_secret and annotation_limit is not None:
+                env_vars["ZOTERO_MCP_ANNOTATION_LIMIT"] = str(int(annotation_limit))
 
             existing.setdefault("mcpServers", {})
             existing["mcpServers"]["zotero"] = {"command": mcp_path, "env": env_vars}
@@ -1343,6 +1362,7 @@ class InstallerAPI:
             return {"path": filepath}
         except Exception as e:
             return {"error": str(e)}
+
 
 
 def main():
