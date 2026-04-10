@@ -13,8 +13,6 @@
 # Press Ctrl+C at any time to quit.
 # =============================================================================
 
-set -e
-
 # Check flags
 USE_FORK=false
 RUN_DIAGNOSE=false
@@ -154,58 +152,80 @@ fi
 if command -v git &>/dev/null; then
     success "Git is available"
 else
-    echo ""
-    warn "Git is not installed. It's needed to download the server."
-    echo ""
-    echo "   We'll open the macOS developer tools installer for you."
-    echo "   A dialog box will appear — click \"Install\" and wait for"
-    echo "   it to finish (this downloads about 1.5 GB and may take"
-    echo "   5-10 minutes depending on your internet speed)."
-    echo ""
-    echo "   Once the install completes, come back to this terminal"
-    echo "   window."
-    echo ""
-    read -p "   Press Enter to open the installer... " -r
-    echo ""
-
-    xcode-select --install 2>/dev/null || true
-
-    echo ""
-    echo "   Waiting for developer tools installation to complete..."
-    echo "   (This script will continue automatically when it detects"
-    echo "    the installation is complete. You can also press Enter"
-    echo "    to check manually.)"
-    echo ""
-
-    while true; do
-        # Check every 3 seconds, but also accept Enter
-        read -t 3 -r USER_INPUT 2>/dev/null || true
-
-        if xcode-select -p &>/dev/null; then
-            success "Developer tools installed successfully. Continuing..."
+    # Check Homebrew locations before triggering Xcode install
+    HOMEBREW_GIT=""
+    for git_candidate in /opt/homebrew/bin/git /usr/local/bin/git; do
+        if [[ -x "$git_candidate" ]]; then
+            HOMEBREW_GIT="$git_candidate"
             break
         fi
-
-        if [[ -n "$USER_INPUT" ]]; then
-            if [[ "$USER_INPUT" =~ ^[Qq]$ ]]; then
-                echo ""
-                echo "   Git is required to continue. To install it:"
-                echo ""
-                echo "   Option 1: Re-run this script (it will try the installer again)"
-                echo "   Option 2: Open Terminal and run: xcode-select --install"
-                echo "   Option 3: Install Git directly from https://git-scm.com/download/mac"
-                echo ""
-                echo "   After installing, re-run this script."
-                exit 1
-            fi
-
-            # User pressed Enter but tools not ready
-            if ! xcode-select -p &>/dev/null; then
-                warn "Installation not complete yet. Still waiting..."
-                echo "      Press Q to quit and troubleshoot, or keep waiting."
-            fi
-        fi
     done
+
+    if [[ -n "$HOMEBREW_GIT" ]]; then
+        export PATH="$(dirname "$HOMEBREW_GIT"):$PATH"
+        success "Git found at $HOMEBREW_GIT"
+    else
+        echo ""
+        warn "Git is not installed. It's needed to download the server."
+        echo ""
+        echo "   We'll open the macOS developer tools installer for you."
+        echo "   A dialog box will appear — click \"Install\" and wait for"
+        echo "   it to finish (this downloads about 1.5 GB and may take"
+        echo "   5-10 minutes depending on your internet speed)."
+        echo ""
+        echo "   If the installer doesn't appear, or the download fails, you can"
+        echo "   download Command Line Tools directly from Apple:"
+        echo "   https://developer.apple.com/download/all/"
+        echo "   (search for \"Command Line Tools\")"
+        echo ""
+        echo "   Once the install completes, come back to this terminal"
+        echo "   window."
+        echo ""
+        read -p "   Press Enter to open the installer... " -r
+        echo ""
+
+        xcode-select --install 2>/dev/null || true
+
+        echo ""
+        echo "   Waiting for developer tools installation to complete..."
+        echo "   (This script will continue automatically when it detects"
+        echo "    the installation is complete. You can also press Enter"
+        echo "    to check manually.)"
+        echo ""
+
+        while true; do
+            # Check every 3 seconds, but also accept Enter
+            read -t 3 -r USER_INPUT 2>/dev/null || true
+
+            if xcode-select -p &>/dev/null; then
+                success "Developer tools installed successfully. Continuing..."
+                break
+            fi
+
+            if [[ -n "$USER_INPUT" ]]; then
+                if [[ "$USER_INPUT" =~ ^[Qq]$ ]]; then
+                    echo ""
+                    echo "   Git is required to continue. To install it:"
+                    echo ""
+                    echo "   Option 1: Re-run this script (it will try the installer again)"
+                    echo "   Option 2: Open Terminal and run: xcode-select --install"
+                    echo "   Option 3: Install Git directly from https://git-scm.com/download/mac"
+                    echo "   Option 4: Download Command Line Tools from Apple:"
+                    echo "             https://developer.apple.com/download/all/"
+                    echo "             (search for \"Command Line Tools\")"
+                    echo ""
+                    echo "   After installing, re-run this script."
+                    exit 1
+                fi
+
+                # User pressed Enter but tools not ready
+                if ! xcode-select -p &>/dev/null; then
+                    warn "Installation not complete yet. Still waiting..."
+                    echo "      Press Q to quit and troubleshoot, or keep waiting."
+                fi
+            fi
+        done
+    fi
 fi
 
 # ============================================================================
@@ -372,7 +392,7 @@ try:
         c = json.load(f)
     print(c.get('mcpServers',{}).get('zotero',{}).get('env',{}).get('ZOTERO_API_KEY',''))
 except: pass
-" 2>/dev/null)
+" 2>/dev/null) || true
         EXISTING_LIBRARY_ID=$(python3 -c "
 import json
 try:
@@ -380,7 +400,7 @@ try:
         c = json.load(f)
     print(c.get('mcpServers',{}).get('zotero',{}).get('env',{}).get('ZOTERO_LIBRARY_ID',''))
 except: pass
-" 2>/dev/null)
+" 2>/dev/null) || true
     fi
 
     section "Setting up Zotero API Access"
@@ -480,10 +500,37 @@ fi
 echo ""
 
 if command -v uv &>/dev/null; then
-    success "uv is already installed ($(uv --version))"
+    success "uv is already installed ($(uv --version 2>/dev/null || echo 'version unknown'))"
 else
     info "Installing uv (Python package manager)..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # Step 1: Try curl install
+    UV_INSTALLED=false
+    if curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null; then
+        UV_INSTALLED=true
+    fi
+
+    # Step 2: If curl failed and brew is available, try brew
+    if [[ "$UV_INSTALLED" == false ]] && command -v brew &>/dev/null; then
+        info "Curl install failed. Trying Homebrew..."
+        if brew install uv 2>/dev/null; then
+            UV_INSTALLED=true
+        fi
+    fi
+
+    # Step 3: If both failed, show manual instructions and exit
+    if [[ "$UV_INSTALLED" == false ]]; then
+        echo ""
+        fail "Could not install uv automatically."
+        echo ""
+        echo "   Please try one of these in your Terminal:"
+        echo ""
+        echo "     Option 1: curl -LsSf https://astral.sh/uv/install.sh | sh"
+        echo "     Option 2: brew install uv"
+        echo ""
+        echo "   Then run this installer script again."
+        exit 1
+    fi
 
     if [[ -f "$HOME/.local/bin/env" ]]; then
         source "$HOME/.local/bin/env"
@@ -533,13 +580,28 @@ else
     INSTALL_PKG="zotero-mcp-server[all]"
 fi
 
-if uv tool list 2>/dev/null | grep -q "zotero-mcp-server"; then
-    uv tool install --force --reinstall "$INSTALL_PKG" > /dev/null 2>&1 &
-else
-    uv tool install "$INSTALL_PKG" > /dev/null 2>&1 &
-fi
+# First attempt
+uv tool install --force --reinstall "$INSTALL_PKG" > /dev/null 2>&1 &
 spin $! "Installing Zotero MCP server..."
-wait $!
+if ! wait $!; then
+    # Second attempt: clear cache and retry (show output this time)
+    warn "First install attempt failed. Retrying..."
+    uv cache clean > /dev/null 2>&1 || true
+    echo ""
+    if ! uv tool install --force --reinstall "$INSTALL_PKG" 2>&1; then
+        echo ""
+        fail "Server installation failed."
+        echo ""
+        echo "   Please try running the following command in your Terminal:"
+        echo ""
+        echo "     uv tool install --force $INSTALL_PKG"
+        echo ""
+        echo "   Once that completes, run this installer script again"
+        echo "   to finish the setup."
+        exit 1
+    fi
+fi
+
 if [[ "$USE_FORK" == true ]]; then
     success "Zotero MCP server installed (from Eugene's fork)"
 else
@@ -563,6 +625,11 @@ for CANDIDATE in \
         fi
     fi
 done
+
+if [[ -z "$ZOTERO_MCP_PATH" ]]; then
+    # Last resort: search common install locations
+    ZOTERO_MCP_PATH=$(find "$HOME/.local" -name "zotero-mcp" -type f -perm +111 2>/dev/null | grep -v "/.cache/" | head -1)
+fi
 
 if [[ -z "$ZOTERO_MCP_PATH" ]]; then
     echo ""
@@ -604,12 +671,15 @@ fi
 if [[ -f "$CLAUDE_CONFIG_FILE" ]]; then
     BACKUP_TIMESTAMP=$(date +%Y-%m-%d_%H%M)
     BACKUP_FILE="${CLAUDE_CONFIG_FILE%.json}_backup_${BACKUP_TIMESTAMP}.json"
-    cp "$CLAUDE_CONFIG_FILE" "$BACKUP_FILE"
-    success "Config backed up to $(basename "$BACKUP_FILE")"
+    if cp "$CLAUDE_CONFIG_FILE" "$BACKUP_FILE" 2>/dev/null; then
+        success "Config backed up to $(basename "$BACKUP_FILE")"
+    else
+        warn "Could not create config backup (continuing anyway)"
+    fi
 fi
 
 # Safely merge JSON config
-python3 << PYEOF
+if ! python3 << PYEOF
 import json, os
 
 config_path = "$CLAUDE_CONFIG_FILE"
@@ -634,6 +704,20 @@ with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
     f.write('\n')
 PYEOF
+then
+    warn "Could not write Claude config automatically."
+    echo ""
+    echo "   Please add the following to your Claude Desktop config file:"
+    echo "   $CLAUDE_CONFIG_FILE"
+    echo ""
+    echo "   Add this inside the \"mcpServers\" section:"
+    echo ""
+    echo "     \"zotero\": {"
+    echo "       \"command\": \"$ZOTERO_MCP_PATH\","
+    echo "       \"env\": $ENV_DICT"
+    echo "     }"
+    echo ""
+fi
 
 success "Claude Desktop configured for $(echo "$ACCESS_MODE" | sed 's/hybrid/hybrid (read + write)/;s/local/local-only (read)/;s/web/web API/') mode"
 pause 0.5
@@ -648,7 +732,7 @@ if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" ]]; then
     SEMANTIC_CONFIG_FILE="$SEMANTIC_CONFIG_DIR/config.json"
     mkdir -p "$SEMANTIC_CONFIG_DIR"
 
-    python3 << PYEOF
+    if ! python3 << PYEOF
 import json, os
 
 config_path = "$SEMANTIC_CONFIG_FILE"
@@ -676,6 +760,9 @@ with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
     f.write('\n')
 PYEOF
+    then
+        warn "Could not write semantic search config. Default settings will be used."
+    fi
 
     success "Auto-update on startup: enabled"
     success "Full-text indexing: enabled"
@@ -713,23 +800,42 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
 
     if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
         # Check if Zotero is reachable — retry loop
-        while ! curl -s --max-time 2 "http://127.0.0.1:23119/api/users/0/items?limit=1" >/dev/null 2>&1; do
-            echo ""
-            warn "Cannot connect to Zotero."
-            echo ""
-            echo "   Please make sure:"
-            echo "   1. Zotero is running"
-            echo "   2. This setting is ENABLED in Zotero:"
-            echo ""
-            echo "      Mac:     Settings > Advanced"
-            echo "      Windows: Edit > Settings > Advanced"
-            echo ""
-            echo "      ☑ Allow other applications on this computer"
-            echo "        to communicate with Zotero"
-            echo ""
-            echo "   Once you've checked both, press Enter to try again"
-            echo "   or press S to skip the database build."
-            echo ""
+        while true; do
+            ZOTERO_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://127.0.0.1:23119/api/users/0/items?limit=1" 2>/dev/null || echo "000")
+            if [[ "$ZOTERO_HTTP_CODE" == "200" ]]; then
+                break  # Zotero is running and API is enabled
+            elif [[ "$ZOTERO_HTTP_CODE" == "403" ]]; then
+                # Zotero is running but API is disabled
+                echo ""
+                warn "Zotero is running, but the local API is not enabled."
+                echo ""
+                echo "   Please enable this setting in Zotero:"
+                echo ""
+                echo "      Settings > Advanced"
+                echo ""
+                echo "      ☑ Allow other applications on this computer"
+                echo "        to communicate with Zotero"
+                echo ""
+                echo "   Once enabled, press Enter to try again"
+                echo "   or press S to skip the database build."
+                echo ""
+            else
+                # Zotero not running or not reachable
+                echo ""
+                warn "Cannot connect to Zotero."
+                echo ""
+                echo "   Please make sure Zotero is running, and that this"
+                echo "   setting is enabled:"
+                echo ""
+                echo "      Settings > Advanced"
+                echo ""
+                echo "      ☑ Allow other applications on this computer"
+                echo "        to communicate with Zotero"
+                echo ""
+                echo "   Press Enter to try again or S to skip."
+                echo ""
+            fi
+
             read -p "   [Enter to retry / S to skip]: " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Ss]$ ]]; then
@@ -740,7 +846,6 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
                 BUILD_SEMANTIC_DB="no"
                 break
             fi
-            # If Enter was pressed, the while loop re-checks connectivity
         done
 
         if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
@@ -759,8 +864,14 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
                 pause 0.5
             else
                 echo ""
-                warn "Database build had issues. You can try again later with:"
-                echo "   $ZOTERO_MCP_PATH update-db --fulltext --force-rebuild"
+                warn "Database build had issues."
+                if [[ -d "$DB_PATH" ]]; then
+                    echo "   A partial database may exist. To rebuild from scratch:"
+                    echo "   $ZOTERO_MCP_PATH update-db --fulltext --force-rebuild"
+                else
+                    echo "   To try again later:"
+                    echo "   $ZOTERO_MCP_PATH update-db --fulltext"
+                fi
             fi
         fi
     fi
@@ -819,4 +930,3 @@ echo ""
 echo "  If you have any issues, run the diagnostic tool:"
 echo "    bash install-zotero-mcp.sh --diagnose"
 echo ""
-
