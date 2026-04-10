@@ -15,13 +15,33 @@
 
 set -e
 
-# Check for -eugene flag (install from fork instead of official release)
+# Check flags
 USE_FORK=false
+RUN_DIAGNOSE=false
 for arg in "$@"; do
     if [[ "$arg" == "-eugene" ]]; then
         USE_FORK=true
+    elif [[ "$arg" == "--diagnose" ]]; then
+        RUN_DIAGNOSE=true
     fi
 done
+
+# --diagnose: run diagnostics only, no install
+if [[ "$RUN_DIAGNOSE" == true ]]; then
+    if ! command -v python3 &>/dev/null; then
+        echo "Error: Python 3 is required to run diagnostics."
+        exit 1
+    fi
+    DIAG_SCRIPT=$(mktemp /tmp/zotero-mcp-diagnostic.XXXXXX.py)
+    trap "rm -f '$DIAG_SCRIPT'" EXIT
+    curl -sL "https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/zotero-mcp-diagnostic.py" -o "$DIAG_SCRIPT" 2>/dev/null
+    if [[ ! -s "$DIAG_SCRIPT" ]]; then
+        echo "Error: Could not download diagnostic script. Check your internet connection."
+        exit 1
+    fi
+    python3 "$DIAG_SCRIPT" "$@"
+    exit $?
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -507,7 +527,7 @@ if pip3 show zotero-mcp-server &>/dev/null 2>&1; then
 fi
 
 if [[ "$USE_FORK" == true ]]; then
-    INSTALL_PKG="zotero-mcp-server[all] @ git+https://github.com/ehawkin/zotero-mcp.git"
+    INSTALL_PKG="zotero-mcp-server[all] @ git+https://github.com/ehawkin/zotero-mcp@secret"
     info "Installing from Eugene's fork (latest development version)..."
 else
     INSTALL_PKG="zotero-mcp-server[all]"
@@ -792,4 +812,11 @@ if [[ "$ENABLE_SEMANTIC_SEARCH" == "no" ]]; then
     echo "  To enable, re-run this script or run:"
     echo "  $ZOTERO_MCP_PATH update-db --fulltext"
 fi
+
+echo ""
+echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  If you have any issues, run the diagnostic tool:"
+echo "    bash install-zotero-mcp.sh --diagnose"
+echo ""
 

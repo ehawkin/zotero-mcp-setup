@@ -12,10 +12,31 @@
 # =============================================================================
 
 param(
-    [switch]$eugene
+    [switch]$eugene,
+    [switch]$diagnose
 )
 
 $ErrorActionPreference = "Stop"
+
+# --diagnose: run diagnostics only, no install
+if ($diagnose) {
+    $py = Get-Command python3 -ErrorAction SilentlyContinue
+    if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
+    if (-not $py) {
+        Write-Host "Error: Python 3 is required to run diagnostics." -ForegroundColor Red
+        exit 1
+    }
+    $diagScript = [System.IO.Path]::GetTempFileName() -replace '\.tmp$', '.py'
+    try {
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ehawkin/zotero-mcp-setup/main/zotero-mcp-diagnostic.py" -OutFile $diagScript -UseBasicParsing
+    } catch {
+        Write-Host "Error: Could not download diagnostic script. Check your internet connection." -ForegroundColor Red
+        exit 1
+    }
+    & $py.Source $diagScript
+    Remove-Item $diagScript -ErrorAction SilentlyContinue
+    exit $LASTEXITCODE
+}
 
 # --- PS 5.1 compatible helper functions ---
 function Info($msg)    { Write-Host "  [INFO] $msg" -ForegroundColor Cyan }
@@ -433,7 +454,7 @@ if (Get-Command pip -ErrorAction SilentlyContinue) {
 
 # Determine install source
 if ($eugene) {
-    $InstallPkg = "zotero-mcp-server[all] @ git+https://github.com/ehawkin/zotero-mcp.git"
+    $InstallPkg = "zotero-mcp-server[all] @ git+https://github.com/ehawkin/zotero-mcp@secret"
     Info "Installing from Eugene's fork (latest development version)..."
 } else {
     $InstallPkg = "zotero-mcp-server[all]"
@@ -705,4 +726,9 @@ if (-not $EnableSemantic) {
     Write-Host "  To enable, re-run this script."
 }
 
+Write-Host ""
+Write-Host "  ========================================================" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  If you have any issues, run the diagnostic tool:"
+Write-Host "    powershell -ExecutionPolicy Bypass -File install-zotero-mcp.ps1 -diagnose"
 Write-Host ""
