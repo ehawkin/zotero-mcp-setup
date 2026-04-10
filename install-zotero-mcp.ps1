@@ -16,7 +16,7 @@ param(
     [switch]$diagnose
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 # --diagnose: run diagnostics only, no install
 if ($diagnose) {
@@ -157,15 +157,20 @@ if (Test-Path $ClaudeConfigDir) {
 if (Get-Command git -ErrorAction SilentlyContinue) {
     Success "Git is available"
 } else {
-    Write-Host ""
     Warn "Git is not installed. It's needed to download the server."
     Write-Host ""
-    Write-Host "   Please install Git for Windows from:"
-    Write-Host "   https://git-scm.com/download/win"
+    Write-Host "   Please install Git using one of these methods:"
     Write-Host ""
-    Write-Host "   After installing, re-run this script."
+    Write-Host "   Option 1 (if you have winget):"
+    Write-Host "     winget install Git.Git"
     Write-Host ""
-    Fail "Git is required. Install it and re-run this script."
+    Write-Host "   Option 2 (download installer):"
+    Write-Host "     https://git-scm.com/download/win"
+    Write-Host ""
+    Write-Host "   After installing, close and reopen PowerShell,"
+    Write-Host "   then re-run this script."
+    Write-Host ""
+    Fail "Git is required to continue."
     exit 1
 }
 
@@ -321,7 +326,9 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
             $existingConfig = Get-Content $ClaudeConfigFile -Raw | ConvertFrom-Json
             $ExistingApiKey = $existingConfig.mcpServers.zotero.env.ZOTERO_API_KEY
             $ExistingLibraryId = $existingConfig.mcpServers.zotero.env.ZOTERO_LIBRARY_ID
-        } catch { }
+        } catch {
+            # Config unreadable or missing credentials — will fall through to manual entry
+        }
     }
 
     Section "Setting up Zotero API Access"
@@ -417,17 +424,46 @@ if ($AccessMode -eq "hybrid" -or $AccessMode -eq "web") {
 Section "Installing Dependencies"
 
 if (Get-Command uv -ErrorAction SilentlyContinue) {
-    $uvVer = uv --version 2>$null
+    $uvVer = try { uv --version 2>$null } catch { "version unknown" }
     Success "uv is already installed ($uvVer)"
 } else {
     Info "Installing uv (Python package manager)..."
-    irm https://astral.sh/uv/install.ps1 | iex
-    $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 
-    if (Get-Command uv -ErrorAction SilentlyContinue) {
+    # Attempt 1: PowerShell installer
+    $uvInstalled = $false
+    try {
+        irm https://astral.sh/uv/install.ps1 | iex
+        $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
+        if (Get-Command uv -ErrorAction SilentlyContinue) {
+            $uvInstalled = $true
+        }
+    } catch { }
+
+    # Attempt 2: Try winget
+    if (-not $uvInstalled) {
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            Warn "Direct install failed. Trying winget..."
+            try {
+                winget install astral-sh.uv --silent 2>$null
+                $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
+                if (Get-Command uv -ErrorAction SilentlyContinue) {
+                    $uvInstalled = $true
+                }
+            } catch { }
+        }
+    }
+
+    if ($uvInstalled) {
         Success "uv installed"
     } else {
-        Fail "uv installation failed."
+        Fail "Could not install uv automatically."
+        Write-Host ""
+        Write-Host "   Please try one of these in PowerShell:"
+        Write-Host ""
+        Write-Host "     Option 1: irm https://astral.sh/uv/install.ps1 | iex"
+        Write-Host "     Option 2: winget install astral-sh.uv"
+        Write-Host ""
+        Write-Host "   Then run this installer script again."
         exit 1
     }
 }
@@ -460,16 +496,38 @@ if ($eugene) {
     $InstallPkg = "zotero-mcp-server[all]"
 }
 
-$uvList = uv tool list 2>$null
+# First attempt
+$installSuccess = $false
+$uvList = try { uv tool list 2>$null } catch { "" }
 if ($uvList -match "zotero-mcp-server") {
     uv tool install --force --reinstall $InstallPkg 2>$null
 } else {
     uv tool install $InstallPkg 2>$null
 }
 
-if ($LASTEXITCODE -ne 0) {
-    Fail "Failed to install Zotero MCP server."
-    Write-Host "   Try running manually: uv tool install $InstallPkg"
+if ($LASTEXITCODE -eq 0) {
+    $installSuccess = $true
+} else {
+    # Second attempt: clear cache and retry with visible output
+    Warn "First install attempt failed. Retrying..."
+    try { uv cache clean 2>$null } catch { }
+    Write-Host ""
+    uv tool install --force --reinstall $InstallPkg 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $installSuccess = $true
+    }
+}
+
+if (-not $installSuccess) {
+    Write-Host ""
+    Fail "Server installation failed."
+    Write-Host ""
+    Write-Host "   Please try running the following command in PowerShell:"
+    Write-Host ""
+    Write-Host "     uv tool install --force $InstallPkg"
+    Write-Host ""
+    Write-Host "   Once that completes, run this installer script again"
+    Write-Host "   to finish the setup."
     exit 1
 }
 
@@ -488,6 +546,11 @@ $ZoteroMcpPath = "$env:USERPROFILE\.local\bin\zotero-mcp.exe"
 if (-not (Test-Path $ZoteroMcpPath)) {
     $found = Get-Command zotero-mcp -ErrorAction SilentlyContinue
     if ($found) { $ZoteroMcpPath = $found.Source }
+}
+if (-not $ZoteroMcpPath -or -not (Test-Path $ZoteroMcpPath)) {
+    # Last resort: search common uv locations
+    $searchResult = Get-ChildItem -Path "$env:USERPROFILE\.local" -Recurse -Filter "zotero-mcp.exe" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike "*\.cache\*" } | Select-Object -First 1
+    if ($searchResult) { $ZoteroMcpPath = $searchResult.FullName }
 }
 if (-not $ZoteroMcpPath -or -not (Test-Path $ZoteroMcpPath)) {
     Write-Host ""
@@ -509,8 +572,12 @@ Section "Configuring Claude Desktop"
 if (Test-Path $ClaudeConfigFile) {
     $backupTs = Get-Date -Format "yyyy-MM-dd_HHmm"
     $backupFile = $ClaudeConfigFile -replace "\.json$", "_backup_$backupTs.json"
-    Copy-Item $ClaudeConfigFile $backupFile
-    Success "Config backed up to $(Split-Path $backupFile -Leaf)"
+    try {
+        Copy-Item $ClaudeConfigFile $backupFile
+        Success "Config backed up to $(Split-Path $backupFile -Leaf)"
+    } catch {
+        Warn "Could not create config backup (continuing anyway)"
+    }
 }
 
 # Build environment variables
@@ -524,33 +591,50 @@ if ($EnableWrite -and $ApiKey -and $LibraryId) {
     $envObj["ZOTERO_LIBRARY_TYPE"] = "user"
 }
 
-# Load existing config (PS 5.1 compatible)
-$config = @{}
-if (Test-Path $ClaudeConfigFile) {
-    try {
-        $raw = Get-Content $ClaudeConfigFile -Raw | ConvertFrom-Json
-        $config = ConvertTo-Hashtable $raw
-    } catch { $config = @{} }
-}
-
-if (-not $config.ContainsKey("mcpServers")) { $config["mcpServers"] = @{} }
-if ($config["mcpServers"] -isnot [hashtable]) {
-    $config["mcpServers"] = ConvertTo-Hashtable $config["mcpServers"]
-}
-$config["mcpServers"]["zotero"] = @{
-    command = $ZoteroMcpPath
-    env = $envObj
-}
-
-# Write without BOM
-Write-JsonNoBom $ClaudeConfigFile $config
-
 $modeLabel = switch ($AccessMode) {
     "hybrid" { "hybrid (read + write)" }
     "local"  { "local-only (read)" }
     "web"    { "web API" }
 }
-Success "Claude Desktop configured for $modeLabel mode"
+
+try {
+    # Load existing config (PS 5.1 compatible)
+    $config = @{}
+    if (Test-Path $ClaudeConfigFile) {
+        try {
+            $raw = Get-Content $ClaudeConfigFile -Raw | ConvertFrom-Json
+            $config = ConvertTo-Hashtable $raw
+        } catch { $config = @{} }
+    }
+
+    if (-not $config.ContainsKey("mcpServers")) { $config["mcpServers"] = @{} }
+    if ($config["mcpServers"] -isnot [hashtable]) {
+        $config["mcpServers"] = ConvertTo-Hashtable $config["mcpServers"]
+    }
+    $config["mcpServers"]["zotero"] = @{
+        command = $ZoteroMcpPath
+        env = $envObj
+    }
+
+    # Write without BOM
+    Write-JsonNoBom $ClaudeConfigFile $config
+
+    Success "Claude Desktop configured for $modeLabel mode"
+} catch {
+    Warn "Could not write Claude config automatically."
+    Write-Host ""
+    Write-Host "   Please edit your Claude Desktop config file:"
+    Write-Host "   $ClaudeConfigFile"
+    Write-Host ""
+    Write-Host "   Add a 'zotero' entry inside 'mcpServers' with:"
+    Write-Host "     command: $ZoteroMcpPath"
+    if ($EnableWrite -and $ApiKey) {
+        Write-Host "     env: ZOTERO_LOCAL=true, ZOTERO_API_KEY=$ApiKey, ZOTERO_LIBRARY_ID=$LibraryId"
+    } else {
+        Write-Host "     env: ZOTERO_LOCAL=true"
+    }
+    Write-Host ""
+}
 Pause-Script 0.5
 
 # ============================================================================
@@ -559,39 +643,42 @@ Pause-Script 0.5
 
 if ($EnableSemantic) {
     Section "Configuring Semantic Search"
+    try {
+        $semConfigDir = "$env:USERPROFILE\.config\zotero-mcp"
+        $semConfigFile = "$semConfigDir\config.json"
+        New-Item -ItemType Directory -Path $semConfigDir -Force | Out-Null
 
-    $semConfigDir = "$env:USERPROFILE\.config\zotero-mcp"
-    $semConfigFile = "$semConfigDir\config.json"
-    New-Item -ItemType Directory -Path $semConfigDir -Force | Out-Null
+        # Load existing config (PS 5.1 compatible)
+        $semConfig = @{}
+        if (Test-Path $semConfigFile) {
+            try {
+                $raw = Get-Content $semConfigFile -Raw | ConvertFrom-Json
+                $semConfig = ConvertTo-Hashtable $raw
+            } catch { $semConfig = @{} }
+        }
 
-    # Load existing config (PS 5.1 compatible)
-    $semConfig = @{}
-    if (Test-Path $semConfigFile) {
-        try {
-            $raw = Get-Content $semConfigFile -Raw | ConvertFrom-Json
-            $semConfig = ConvertTo-Hashtable $raw
-        } catch { $semConfig = @{} }
+        if (-not $semConfig.ContainsKey("semantic_search")) { $semConfig["semantic_search"] = @{} }
+        $ss = $semConfig["semantic_search"]
+        if ($ss -isnot [hashtable]) { $ss = ConvertTo-Hashtable $ss; $semConfig["semantic_search"] = $ss }
+        if (-not $ss.ContainsKey("update_config")) { $ss["update_config"] = @{} }
+        $ss["update_config"]["auto_update"] = $true
+        $ss["update_config"]["update_frequency"] = "startup"
+
+        if (-not $ss.ContainsKey("extraction")) { $ss["extraction"] = @{} }
+        $ss["extraction"]["pdf_max_pages"] = $PdfIndexPages
+        $ss["extraction"]["fulltext_display_max_pages"] = $PdfDisplayPages
+
+        # Write without BOM
+        Write-JsonNoBom $semConfigFile $semConfig
+
+        Success "Auto-update on startup: enabled"
+        Success "Full-text indexing: enabled"
+        Success "PDF indexing limit: $PdfIndexPages pages"
+        Write-Host ""
+        Success "Display limit: $PdfDisplayPages pages"
+    } catch {
+        Warn "Could not write semantic search config. Default settings will be used."
     }
-
-    if (-not $semConfig.ContainsKey("semantic_search")) { $semConfig["semantic_search"] = @{} }
-    $ss = $semConfig["semantic_search"]
-    if ($ss -isnot [hashtable]) { $ss = ConvertTo-Hashtable $ss; $semConfig["semantic_search"] = $ss }
-    if (-not $ss.ContainsKey("update_config")) { $ss["update_config"] = @{} }
-    $ss["update_config"]["auto_update"] = $true
-    $ss["update_config"]["update_frequency"] = "startup"
-
-    if (-not $ss.ContainsKey("extraction")) { $ss["extraction"] = @{} }
-    $ss["extraction"]["pdf_max_pages"] = $PdfIndexPages
-    $ss["extraction"]["fulltext_display_max_pages"] = $PdfDisplayPages
-
-    # Write without BOM
-    Write-JsonNoBom $semConfigFile $semConfig
-
-    Success "Auto-update on startup: enabled"
-    Success "Full-text indexing: enabled"
-    Success "PDF indexing limit: $PdfIndexPages pages"
-    Write-Host ""
-    Success "Display limit: $PdfDisplayPages pages"
 }
 
 # ============================================================================
@@ -623,34 +710,55 @@ if ($BuildDb) {
         # Retry loop for Zotero connectivity
         $connected = $false
         while (-not $connected) {
+            $zoteroStatus = "not_running"
             try {
-                Invoke-WebRequest -Uri "http://127.0.0.1:23119/api/users/0/items?limit=1" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop | Out-Null
+                $response = Invoke-WebRequest -Uri "http://127.0.0.1:23119/api/users/0/items?limit=1" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
                 $connected = $true
+                $zoteroStatus = "ready"
             } catch {
+                if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 403) {
+                    $zoteroStatus = "api_disabled"
+                }
+            }
+
+            if ($connected) { break }
+
+            if ($zoteroStatus -eq "api_disabled") {
                 Write-Host ""
-                Warn "Cannot connect to Zotero."
+                Warn "Zotero is running, but the local API is not enabled."
                 Write-Host ""
-                Write-Host "   Please make sure:"
-                Write-Host "   1. Zotero is running"
-                Write-Host "   2. This setting is ENABLED in Zotero:"
+                Write-Host "   Please enable this setting in Zotero:"
                 Write-Host ""
                 Write-Host "      Edit > Settings > Advanced"
                 Write-Host ""
                 Write-Host "      [x] Allow other applications on this computer"
                 Write-Host "          to communicate with Zotero"
                 Write-Host ""
-                Write-Host "   Once you've checked both, press Enter to try again"
+                Write-Host "   Once enabled, press Enter to try again"
                 Write-Host "   or type S to skip the database build."
+            } else {
                 Write-Host ""
-                $retryReply = Read-Host "   [Enter to retry / S to skip]"
-                if ($retryReply -match "^[Ss]") {
-                    Info "Skipping database build."
-                    Write-Host "   Start Zotero with the setting enabled, then run:"
-                    Write-Host "   $ZoteroMcpPath update-db --fulltext"
-                    Write-Host "   Or just open Claude Desktop - it will build automatically."
-                    $BuildDb = $false
-                    break
-                }
+                Warn "Cannot connect to Zotero."
+                Write-Host ""
+                Write-Host "   Please make sure Zotero is running, and that this"
+                Write-Host "   setting is enabled:"
+                Write-Host ""
+                Write-Host "      Edit > Settings > Advanced"
+                Write-Host ""
+                Write-Host "      [x] Allow other applications on this computer"
+                Write-Host "          to communicate with Zotero"
+                Write-Host ""
+                Write-Host "   Press Enter to try again or type S to skip."
+            }
+            Write-Host ""
+            $retryReply = Read-Host "   [Enter to retry / S to skip]"
+            if ($retryReply -match "^[Ss]") {
+                Info "Skipping database build."
+                Write-Host "   Start Zotero with the setting enabled, then run:"
+                Write-Host "   $ZoteroMcpPath update-db --fulltext"
+                Write-Host "   Or just open Claude Desktop - it will build automatically."
+                $BuildDb = $false
+                break
             }
         }
 
@@ -672,8 +780,15 @@ if ($BuildDb) {
                 Pause-Script 0.5
             } catch {
                 Write-Host ""
-                Warn "Database build had issues. You can try again later with:"
-                Write-Host "   $ZoteroMcpPath update-db --fulltext --force-rebuild"
+                $dbPath2 = "$env:USERPROFILE\.config\zotero-mcp\chroma_db"
+                if (Test-Path $dbPath2) {
+                    Warn "Database build had issues. A partial database may exist."
+                    Write-Host "   To rebuild from scratch:"
+                    Write-Host "   $ZoteroMcpPath update-db --fulltext --force-rebuild"
+                } else {
+                    Warn "Database build had issues. You can try again later with:"
+                    Write-Host "   $ZoteroMcpPath update-db --fulltext"
+                }
             }
         }
     }
