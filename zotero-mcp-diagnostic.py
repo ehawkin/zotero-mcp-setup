@@ -196,7 +196,7 @@ def check_dependencies():
             total += 1
             ver, status = _check_import(venv_py, mod)
             results[mod] = {"version": ver, "status": status, "group": group}
-            if ver != "NOT INSTALLED":
+            if ver not in ("NOT INSTALLED", "UNKNOWN"):
                 installed += 1
             else:
                 missing.append(mod)
