@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+import webbrowser
 
 try:
     import webview
@@ -29,7 +30,7 @@ for _p in [os.path.expanduser("~/.local/bin"), os.path.expanduser("~/.cargo/bin"
         os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
 
 INSTALLER_SCRIPT_VERSION = "1.1.0"
-INSTALLER_GUI_VERSION = "0409"
+
 
 HTML = r"""<!DOCTYPE html>
 <html>
@@ -779,7 +780,6 @@ window.addEventListener('pywebviewready',function(){
 </body></html>"""
 
 
-
 class InstallerAPI:
     def __init__(self):
         self.window = None
@@ -899,9 +899,27 @@ class InstallerAPI:
                                           + os.pathsep + os.environ.get("PATH", ""))
                     self._log("uv installed", "success")
                 else:
-                    self._log("Failed to install uv", "error")
-                    self._complete(False, "Could not install uv.")
-                    return
+                    # Retry: try Homebrew on macOS
+                    if self.is_mac and shutil.which("brew"):
+                        self._log("Retrying with Homebrew...", "info")
+                        t0 = time.time()
+                        proc2 = subprocess.run(["brew", "install", "uv"],
+                                               capture_output=True, text=True, timeout=120)
+                        self._log_raw("Step 1: Install uv (brew)", "brew install uv",
+                                      proc2.stdout, proc2.stderr, proc2.returncode,
+                                      time.time() - t0)
+                        if proc2.returncode == 0:
+                            self._log("uv installed via Homebrew", "success")
+                        else:
+                            self._log("Failed to install uv", "error")
+                            self._complete(False, "Could not install uv. "
+                                           "Try running in Terminal: curl -LsSf https://astral.sh/uv/install.sh | sh")
+                            return
+                    else:
+                        self._log("Failed to install uv", "error")
+                        self._complete(False, "Could not install uv. "
+                                       "Try running in Terminal: curl -LsSf https://astral.sh/uv/install.sh | sh")
+                        return
 
             # Step 2: Server
             self._set_progress(2)
@@ -920,6 +938,15 @@ class InstallerAPI:
                                   capture_output=True, text=True, timeout=300)
             self._log_raw("Step 2: Install server", f"{uv} tool install --force --reinstall {pkg}",
                           proc.stdout, proc.stderr, proc.returncode, time.time() - t0)
+            if proc.returncode != 0:
+                # Retry: clear cache and try again
+                self._log("First attempt failed — clearing cache and retrying...", "warning")
+                subprocess.run([uv, "cache", "clean"], capture_output=True, timeout=30)
+                t0 = time.time()
+                proc = subprocess.run([uv, "tool", "install", "--force", "--reinstall", pkg],
+                                      capture_output=True, text=True, timeout=300)
+                self._log_raw("Step 2: Install server (retry)", f"{uv} tool install --force --reinstall {pkg}",
+                              proc.stdout, proc.stderr, proc.returncode, time.time() - t0)
             if proc.returncode == 0:
                 if use_secret:
                     self._log("Server installed (from Eugene's branch)", "success")
@@ -927,12 +954,25 @@ class InstallerAPI:
                     self._log("Server installed", "success")
             else:
                 self._log(f"Install error: {proc.stderr[:200]}", "error")
-                self._complete(False, "Server installation failed.")
+                self._complete(False, "Server installation failed. "
+                               f"Try running in Terminal: {uv} tool install --force {pkg}")
                 return
 
             mcp_path = shutil.which("zotero-mcp") or os.path.expanduser("~/.local/bin/zotero-mcp")
             if not os.path.isfile(mcp_path):
-                self._complete(False, "Could not find zotero-mcp after installation.")
+                # Fallback: search common uv install locations
+                search_root = os.path.expanduser("~/.local")
+                for dirpath, _, filenames in os.walk(search_root):
+                    if ".cache" in dirpath:
+                        continue
+                    if "zotero-mcp" in filenames:
+                        candidate = os.path.join(dirpath, "zotero-mcp")
+                        if os.access(candidate, os.X_OK):
+                            mcp_path = candidate
+                            break
+            if not os.path.isfile(mcp_path):
+                self._complete(False, "Could not find zotero-mcp after installation. "
+                               "Try running in Terminal: uv tool list")
                 return
 
             # Step 3: Claude config
@@ -973,9 +1013,17 @@ class InstallerAPI:
 
             existing.setdefault("mcpServers", {})
             existing["mcpServers"]["zotero"] = {"command": mcp_path, "env": env_vars}
-            with open(cfg_file, "w") as f:
-                json.dump(existing, f, indent=2)
-                f.write("\n")
+            try:
+                with open(cfg_file, "w") as f:
+                    json.dump(existing, f, indent=2)
+                    f.write("\n")
+            except Exception as e:
+                zotero_entry = json.dumps({"command": mcp_path, "env": env_vars}, indent=4)
+                self._warnings.append(
+                    f"Could not write Claude config automatically. "
+                    f"Please add this to the 'mcpServers' section in {cfg_file}: "
+                    f'"zotero": {zotero_entry}')
+                self._log(f"Config write failed: {e}", "error")
 
             # Read-back verification
             try:
@@ -1295,7 +1343,6 @@ class InstallerAPI:
             return {"path": filepath}
         except Exception as e:
             return {"error": str(e)}
-
 
 
 def main():
