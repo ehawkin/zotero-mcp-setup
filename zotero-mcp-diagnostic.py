@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-DIAGNOSTIC_VERSION = "1.1.0"
+DIAGNOSTIC_VERSION = "1.1.1"
 
 # ---------------------------------------------------------------------------
 # Utility helpers
@@ -76,14 +76,39 @@ def _uv_venv_python():
     return None
 
 
+# Modules whose import chain is heavyweight (loads torch, etc.) and can exceed
+# the normal 10s timeout on a cold interpreter. Give these extra time.
+SLOW_IMPORTS = {"sentence_transformers", "chromadb", "torch"}
+
+# Timeouts for _check_import's subprocess call.
+FAST_IMPORT_TIMEOUT = 10
+SLOW_IMPORT_TIMEOUT = 60  # sentence_transformers/torch cold-start can be 30-50s
+                          # on a freshly installed venv. 60s covers worst case.
+
+
 def _check_import(venv_python, module_name):
-    """Check if a Python module is importable in the venv, return version or status."""
+    """Check if a Python module is importable in the venv, return version or status.
+
+    Returns:
+        (version_or_sentinel, detail) tuple. Sentinels:
+          - version string (e.g. "5.4.0") → module installed and importable
+          - "TIMEOUT" → import hit the time limit but the module exists on disk;
+                       probably installed but slow to warm up. Treated as installed.
+          - "NOT INSTALLED" → import failed with a real error (missing / broken)
+          - "UNKNOWN" → no venv Python available to check with
+    """
     if not venv_python:
         return "UNKNOWN", "venv Python not found"
     code = f"import {module_name}; print(getattr({module_name}, '__version__', 'installed'))"
-    stdout, stderr, rc = _run([venv_python, "-c", code], timeout=10)
+    timeout = SLOW_IMPORT_TIMEOUT if module_name in SLOW_IMPORTS else FAST_IMPORT_TIMEOUT
+    stdout, stderr, rc = _run([venv_python, "-c", code], timeout=timeout)
     if rc == 0 and stdout:
         return stdout.strip(), "OK"
+    # _run returns rc=-2 specifically on TimeoutExpired. Treat timeouts as
+    # "installed but slow" rather than "not installed" — we know the subprocess
+    # got far enough to start the import, it just didn't finish in time.
+    if rc == -2:
+        return "TIMEOUT", f"import exceeded {timeout}s (treating as installed)"
     return "NOT INSTALLED", stderr[:100] if stderr else "import failed"
 
 
@@ -179,6 +204,16 @@ def check_git():
 def check_dependencies():
     """Check all Python dependencies in uv's venv."""
     venv_py = _uv_venv_python()
+
+    # If the venv itself is missing, report that clearly rather than showing
+    # every module as "not installed" (which looks like 15 separate problems
+    # when it's really one: the whole install is corrupted).
+    if venv_py is None:
+        return ("dependencies", "FAIL",
+                "Installation venv missing or corrupted — re-run the installer to fix",
+                {"venv_missing": True, "packages": {}, "extras": "unknown",
+                 "installed": 0, "total": 0})
+
     deps = {
         "core": ["fastmcp", "mcp", "pydantic", "dotenv", "pyzotero", "requests", "unidecode", "markitdown"],
         "pdf": ["pymupdf", "ebooklib"],
@@ -196,6 +231,9 @@ def check_dependencies():
             total += 1
             ver, status = _check_import(venv_py, mod)
             results[mod] = {"version": ver, "status": status, "group": group}
+            # TIMEOUT counts as installed — we know the module file exists and
+            # the import subprocess got past the file lookup. Only NOT INSTALLED
+            # and UNKNOWN are treated as missing.
             if ver not in ("NOT INSTALLED", "UNKNOWN"):
                 installed += 1
             else:
