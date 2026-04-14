@@ -209,3 +209,15 @@ To force a complete rebuild from scratch (applies new settings to all papers):
 - **Zotero MCP project:** [github.com/54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp)
 - **This setup guide and scripts:** [github.com/ehawkin/zotero-mcp-setup](https://github.com/ehawkin/zotero-mcp-setup)
 - We contributed significantly to the Zotero MCP project — our additions include 11 new tools, 20+ bug fixes, and 339 automated tests (PRs [#165](https://github.com/54yyyu/zotero-mcp/pull/165), [#170](https://github.com/54yyyu/zotero-mcp/pull/170), [#174](https://github.com/54yyyu/zotero-mcp/pull/174)).
+
+---
+
+### About this project
+
+Copyright © 2026 Silver Apps LLC. The installer binaries distributed via GitHub Releases are signed and notarized by Silver Apps LLC.
+
+This installer sets up [zotero-mcp](https://github.com/54yyyu/zotero-mcp) by 54yyyu (MIT licensed). It is not affiliated with the Zotero project or with Anthropic.
+
+**Source availability.** This repository's source is published for transparency — so you can inspect exactly what the installer does before running it. The source is **not** currently released under an open-source license; there is no `LICENSE` file intentionally. If you'd like to reuse or redistribute parts of this code, please reach out.
+
+**Installer is provided as-is.** Without warranty of any kind. Your Claude Desktop config is backed up automatically before any changes are made. The installer does not collect any data about you or your usage.

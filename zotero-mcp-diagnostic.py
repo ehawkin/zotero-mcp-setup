@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-DIAGNOSTIC_VERSION = "1.1.2"
+DIAGNOSTIC_VERSION = "1.1.3"
 
 # ---------------------------------------------------------------------------
 # Utility helpers
