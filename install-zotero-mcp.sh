@@ -9,6 +9,7 @@
 #
 # Usage: bash install-zotero-mcp.sh
 #        bash install-zotero-mcp.sh -eugene   (install from Eugene's fork)
+#        bash install-zotero-mcp.sh --help    (list all flags)
 # Do NOT run with sudo.
 # Press Ctrl+C at any time to quit.
 # =============================================================================
@@ -16,13 +17,122 @@
 # Check flags
 USE_FORK=false
 RUN_DIAGNOSE=false
-for arg in "$@"; do
-    if [[ "$arg" == "-eugene" ]]; then
-        USE_FORK=true
-    elif [[ "$arg" == "--diagnose" ]]; then
-        RUN_DIAGNOSE=true
+SHOW_HELP=false
+# New flags. Start empty so the Advanced-mode interactive prompts can
+# distinguish "user supplied a flag" from "user took the default" — see
+# the fallback block right after the advanced-mode section, which fills
+# in the GUI-matching defaults (local / small / full) for anything still
+# unset by the time we leave configuration.
+EMBEDDING_MODEL=""             # local|openai|gemini  (default: local)
+OPENAI_VARIANT=""              # small|large           (default: small)
+OPENAI_KEY=""
+GEMINI_KEY=""
+INDEX_DEPTH=""                 # metadata|full         (default: full)
+FLAG_PAGES_INDEX=""            # if set, overrides interactive default
+FLAG_PAGES_DISPLAY=""          # if set, overrides interactive default
+FLAG_ANNOTATION_LIMIT=""       # if set, injected into env
+
+print_help() {
+    cat <<'HLP'
+Zotero MCP Setup Wizard — CLI installer
+
+Usage: bash install-zotero-mcp.sh [flags]
+
+Flags:
+  -eugene                      Install from Eugene's fork (secret branch)
+  --diagnose                   Run diagnostics only (no install)
+  --help                       Show this help and exit
+
+  --embedding=MODE             Embedding backend: local|openai|gemini  (default: local)
+  --openai-variant=SIZE        OpenAI model size: small|large          (default: small)
+  --openai-key=KEY             OpenAI API key (used with --embedding=openai)
+  --gemini-key=KEY             Gemini API key (used with --embedding=gemini)
+  --index-depth=LEVEL          Index depth: metadata|full              (default: full)
+                               full = pass --fulltext to update-db
+  --pages-index=N              PDF pages to index (default: 50)
+  --pages-display=N            PDF pages Claude can read (default: 10)
+  --annotation-limit=N         Max annotations returned per query
+
+Example:
+  bash install-zotero-mcp.sh --embedding=openai --openai-key=sk-xxx --pages-index=100
+HLP
+}
+
+# Validate a value against an allowed set
+_validate_choice() {
+    local value="$1"; local name="$2"; shift 2
+    for allowed in "$@"; do
+        [[ "$value" == "$allowed" ]] && return 0
+    done
+    echo "Error: invalid value for $name: '$value' (expected: $*)" >&2
+    exit 1
+}
+
+_validate_int() {
+    local value="$1"; local name="$2"
+    if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+        echo "Error: $name must be a positive integer (got '$value')" >&2
+        exit 1
     fi
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        -eugene)
+            USE_FORK=true ;;
+        --diagnose)
+            RUN_DIAGNOSE=true ;;
+        --help|-h)
+            SHOW_HELP=true ;;
+        --embedding=*)
+            EMBEDDING_MODEL="${arg#--embedding=}"
+            _validate_choice "$EMBEDDING_MODEL" "--embedding" local openai gemini ;;
+        --openai-variant=*)
+            OPENAI_VARIANT="${arg#--openai-variant=}"
+            _validate_choice "$OPENAI_VARIANT" "--openai-variant" small large ;;
+        --openai-key=*)
+            OPENAI_KEY="${arg#--openai-key=}" ;;
+        --gemini-key=*)
+            GEMINI_KEY="${arg#--gemini-key=}" ;;
+        --index-depth=*)
+            INDEX_DEPTH="${arg#--index-depth=}"
+            _validate_choice "$INDEX_DEPTH" "--index-depth" metadata full ;;
+        --pages-index=*)
+            FLAG_PAGES_INDEX="${arg#--pages-index=}"
+            _validate_int "$FLAG_PAGES_INDEX" "--pages-index" ;;
+        --pages-display=*)
+            FLAG_PAGES_DISPLAY="${arg#--pages-display=}"
+            _validate_int "$FLAG_PAGES_DISPLAY" "--pages-display" ;;
+        --annotation-limit=*)
+            FLAG_ANNOTATION_LIMIT="${arg#--annotation-limit=}"
+            _validate_int "$FLAG_ANNOTATION_LIMIT" "--annotation-limit" ;;
+        *)
+            # Unknown flag — don't hard-fail; preserve any legacy behavior
+            ;;
+    esac
 done
+
+if [[ "$SHOW_HELP" == true ]]; then
+    print_help
+    exit 0
+fi
+
+# Warn if --embedding=openai but no key provided (mirrors GUI behavior:
+# allow blank key, but first indexing call will fail).
+if [[ "$EMBEDDING_MODEL" == "openai" && -z "$OPENAI_KEY" ]]; then
+    echo "" >&2
+    echo "Warning: --embedding=openai without --openai-key." >&2
+    echo "  You'll need to set OPENAI_API_KEY in your environment before" >&2
+    echo "  indexing will work. The install will continue." >&2
+    echo "" >&2
+fi
+if [[ "$EMBEDDING_MODEL" == "gemini" && -z "$GEMINI_KEY" ]]; then
+    echo "" >&2
+    echo "Warning: --embedding=gemini without --gemini-key." >&2
+    echo "  You'll need to set GEMINI_API_KEY in your environment before" >&2
+    echo "  indexing will work. The install will continue." >&2
+    echo "" >&2
+fi
 
 # --diagnose: run diagnostics only, no install
 if [[ "$RUN_DIAGNOSE" == true ]]; then
@@ -58,6 +168,10 @@ fail()    { echo -e "${RED}  ✗${NC} $1"; }
 # UX helpers
 pause()   { sleep "${1:-0.5}"; }  # Brief pause between sections
 section() { echo ""; echo -e "${CYAN}━━ $1 ━━${NC}"; echo ""; pause 0.3; }
+# Lightweight separator between consecutive questions inside a section,
+# so the user's eye sees each question as a distinct unit instead of a
+# wall of running text.
+qsep() { echo ""; echo -e "  ${CYAN}─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─${NC}"; echo ""; }
 
 # Spinner for long-running operations
 spin() {
@@ -246,6 +360,20 @@ PDF_INDEX_PAGES="50"
 PDF_DISPLAY_PAGES="10"
 ANNOTATION_LIMIT=""
 
+# Apply flag overrides for page counts and annotation limit (if supplied).
+# These supersede the interactive defaults and will be used directly in
+# non-interactive (flag-driven) runs; if the user picks Advanced mode
+# interactively, the prompts below will still run and can further adjust.
+if [[ -n "$FLAG_PAGES_INDEX" ]]; then
+    PDF_INDEX_PAGES="$FLAG_PAGES_INDEX"
+fi
+if [[ -n "$FLAG_PAGES_DISPLAY" ]]; then
+    PDF_DISPLAY_PAGES="$FLAG_PAGES_DISPLAY"
+fi
+if [[ -n "$FLAG_ANNOTATION_LIMIT" ]]; then
+    ANNOTATION_LIMIT="$FLAG_ANNOTATION_LIMIT"
+fi
+
 # If Zotero not found, force web API mode
 if [[ "$ZOTERO_FOUND" == false ]]; then
     info "Zotero not installed — configuring Web API-only mode."
@@ -320,13 +448,115 @@ if [[ "$SETUP_MODE" == "2" ]]; then
         fi
     fi
 
-    # PDF indexing pages
-    if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" ]]; then
+    # Embedding model
+    if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" && -z "$EMBEDDING_MODEL" ]]; then
+        qsep
+        echo "  Which embedding model should index your library?"
         echo ""
+        echo "    1) Local — free  (recommended)"
+        echo "       Runs on your computer with a small AI model."
+        echo "       No account, no API key, no cost."
+        echo ""
+        echo "    2) OpenAI — pay per use"
+        echo "       Higher-quality embeddings. Requires an OpenAI API"
+        echo "       account (separate from ChatGPT). Bills per token."
+        echo ""
+        echo "    3) Gemini — generous free tier"
+        echo "       Google's embedding model. The free tier covers most"
+        echo "       typical libraries. Requires a Gemini API key."
+        echo ""
+        read -p "  Press 1, 2, or 3 (default: 1): " -n 1 EMBED_CHOICE
+        echo ""
+        case "$EMBED_CHOICE" in
+            2) EMBEDDING_MODEL="openai" ;;
+            3) EMBEDDING_MODEL="gemini" ;;
+            *) EMBEDDING_MODEL="local" ;;
+        esac
+    fi
+
+    # OpenAI variant (small vs large)
+    if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" && "$EMBEDDING_MODEL" == "openai" && -z "$OPENAI_VARIANT" ]]; then
+        qsep
+        echo "  Which OpenAI embedding model?"
+        echo ""
+        echo "    1) text-embedding-3-small  (default, cheaper)"
+        echo "       Good quality. ~\$0.60 per 1,000 papers (full text, 50 pages)."
+        echo ""
+        echo "    2) text-embedding-3-large"
+        echo "       Best quality. ~6.5x the cost: ~\$3.90 per 1,000 papers."
+        echo ""
+        read -p "  Press 1 or 2 (default: 1): " -n 1 OAI_CHOICE
+        echo ""
+        case "$OAI_CHOICE" in
+            2) OPENAI_VARIANT="large" ;;
+            *) OPENAI_VARIANT="small" ;;
+        esac
+    fi
+
+    # OpenAI API key
+    if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" && "$EMBEDDING_MODEL" == "openai" && -z "$OPENAI_KEY" ]]; then
+        qsep
+        echo "  OpenAI API key (starts with sk-)."
+        echo "  Get one at https://platform.openai.com/api-keys"
+        echo "  (separate from ChatGPT subscription)."
+        echo ""
+        echo "  Press Enter to skip — we'll fall back to the free local"
+        echo "  embedding model instead. You can switch to OpenAI later by"
+        echo "  re-running this script."
+        echo ""
+        read -p "  Paste API key (or Enter to skip): " OPENAI_KEY
+        if [[ -z "$OPENAI_KEY" ]]; then
+            echo ""
+            info "No OpenAI key entered — falling back to the free local embedding model."
+            EMBEDDING_MODEL="local"
+            OPENAI_VARIANT=""   # variant choice no longer relevant
+        fi
+    fi
+
+    # Gemini API key
+    if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" && "$EMBEDDING_MODEL" == "gemini" && -z "$GEMINI_KEY" ]]; then
+        qsep
+        echo "  Gemini API key (starts with AIza)."
+        echo "  Get one at https://aistudio.google.com/apikey"
+        echo ""
+        echo "  Press Enter to skip — we'll fall back to the free local"
+        echo "  embedding model instead. You can switch to Gemini later by"
+        echo "  re-running this script."
+        echo ""
+        read -p "  Paste API key (or Enter to skip): " GEMINI_KEY
+        if [[ -z "$GEMINI_KEY" ]]; then
+            echo ""
+            info "No Gemini key entered — falling back to the free local embedding model."
+            EMBEDDING_MODEL="local"
+        fi
+    fi
+
+    # Index depth (metadata only vs full text)
+    if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" && -z "$INDEX_DEPTH" ]]; then
+        qsep
+        echo "  What should be indexed?"
+        echo ""
+        echo "    1) Full text  (recommended)"
+        echo "       Indexes PDF body text up to the page limit below."
+        echo "       Claude can find papers by any phrase or concept."
+        echo ""
+        echo "    2) Metadata only"
+        echo "       Titles, authors, abstracts, tags. Fastest to build,"
+        echo "       cheapest on paid models, but no PDF-text search."
+        echo ""
+        read -p "  Press 1 or 2 (default: 1): " -n 1 DEPTH_CHOICE
+        echo ""
+        case "$DEPTH_CHOICE" in
+            2) INDEX_DEPTH="metadata" ;;
+            *) INDEX_DEPTH="full" ;;
+        esac
+    fi
+
+    # PDF indexing pages — only relevant when full-text indexing
+    if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" && "$INDEX_DEPTH" == "full" ]]; then
+        qsep
         echo "  How many pages of each PDF should be indexed for search?"
         echo "  More pages = better search but longer initial build time."
-        echo "  By default, this uses a local model — no tokens or usage"
-        echo "  limits consumed."
         echo ""
         echo "    • 10 pages  — fast build, covers abstract + introduction"
         echo "    • 20 pages  — moderate, adds some results/discussion"
@@ -342,7 +572,7 @@ if [[ "$SETUP_MODE" == "2" ]]; then
     fi
 
     # Display pages
-    echo ""
+    qsep
     echo "  When Claude reads a paper during conversation, how many pages"
     echo "  should it have access to and read? More pages = better"
     echo "  understanding but uses more of your Claude usage allowance"
@@ -359,9 +589,12 @@ if [[ "$SETUP_MODE" == "2" ]]; then
         PDF_DISPLAY_PAGES="10"
     fi
 
-    # Annotation limit (Eugene's fork only)
+    # Annotation limit (currently only respected by Eugene's fork; once
+    # upstream merges, it'll apply to everyone — keep the question gated
+    # for now so default-fork users aren't asked about a setting that
+    # has no effect for them).
     if [[ "$USE_FORK" == true ]]; then
-        echo ""
+        qsep
         echo "  Maximum annotations returned per query."
         echo "  Controls how many annotations Claude can retrieve at once."
         echo "  Higher values = more context but uses more of the conversation window."
@@ -382,7 +615,7 @@ if [[ "$SETUP_MODE" == "2" ]]; then
 
     # Semantic DB build timing
     if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" ]]; then
-        echo ""
+        qsep
         echo "  Would you like to build the semantic search database now?"
         echo "  This is a one-time process that takes 5-15 minutes."
         echo ""
@@ -398,6 +631,13 @@ if [[ "$SETUP_MODE" == "2" ]]; then
     fi
 
 fi  # end advanced mode
+
+# Apply GUI-matching defaults to anything not set by flag or by the
+# Advanced-mode prompts above. Default-mode users land here without ever
+# having been asked, so the values must end up populated.
+[[ -z "$EMBEDDING_MODEL" ]] && EMBEDDING_MODEL="local"
+[[ -z "$OPENAI_VARIANT"  ]] && OPENAI_VARIANT="small"
+[[ -z "$INDEX_DEPTH"     ]] && INDEX_DEPTH="full"
 
 # --- Prompt for API credentials ---
 if [[ "$ACCESS_MODE" == "hybrid" ]] || [[ "$ACCESS_MODE" == "web" ]]; then
@@ -674,19 +914,55 @@ fi
 
 echo ""
 
-# Build environment variables based on access mode
+# Build environment variables based on access mode.
+# Mirrors lib/installer_core.py _build_zotero_env_vars().
+# Build as shell key=value pairs first, then translate to a Python dict literal
+# for the json merger below (and also export to the update-db subprocess).
+declare -a ENV_KEYS=()
+declare -a ENV_VALUES=()
+_env_add() { ENV_KEYS+=("$1"); ENV_VALUES+=("$2"); }
+
 if [[ "$ACCESS_MODE" == "web" ]]; then
-    ENV_DICT="{'ZOTERO_API_KEY': '$ZOTERO_API_KEY', 'ZOTERO_LIBRARY_ID': '$ZOTERO_LIBRARY_ID', 'ZOTERO_LIBRARY_TYPE': 'user'}"
+    _env_add "ZOTERO_API_KEY"      "$ZOTERO_API_KEY"
+    _env_add "ZOTERO_LIBRARY_ID"   "$ZOTERO_LIBRARY_ID"
+    _env_add "ZOTERO_LIBRARY_TYPE" "user"
 else
-    ENV_DICT="{'ZOTERO_LOCAL': 'true'"
+    _env_add "ZOTERO_LOCAL" "true"
     if [[ -n "$ENABLE_WRITE_SUPPORT" ]] && [[ -n "$ZOTERO_API_KEY" ]] && [[ -n "$ZOTERO_LIBRARY_ID" ]]; then
-        ENV_DICT="$ENV_DICT, 'ZOTERO_API_KEY': '$ZOTERO_API_KEY', 'ZOTERO_LIBRARY_ID': '$ZOTERO_LIBRARY_ID', 'ZOTERO_LIBRARY_TYPE': 'user'"
+        _env_add "ZOTERO_API_KEY"      "$ZOTERO_API_KEY"
+        _env_add "ZOTERO_LIBRARY_ID"   "$ZOTERO_LIBRARY_ID"
+        _env_add "ZOTERO_LIBRARY_TYPE" "user"
     fi
     if [[ -n "$ANNOTATION_LIMIT" ]]; then
-        ENV_DICT="$ENV_DICT, 'ZOTERO_MCP_ANNOTATION_LIMIT': '$ANNOTATION_LIMIT'"
+        _env_add "ZOTERO_MCP_ANNOTATION_LIMIT" "$ANNOTATION_LIMIT"
     fi
-    ENV_DICT="$ENV_DICT}"
 fi
+
+# Embedding backend env vars (GUI parity: _build_zotero_env_vars)
+if [[ "$EMBEDDING_MODEL" == "openai" ]]; then
+    _env_add "ZOTERO_EMBEDDING_MODEL" "openai"
+    if [[ "$OPENAI_VARIANT" == "large" ]]; then
+        _env_add "OPENAI_EMBEDDING_MODEL" "text-embedding-3-large"
+    else
+        _env_add "OPENAI_EMBEDDING_MODEL" "text-embedding-3-small"
+    fi
+    if [[ -n "$OPENAI_KEY" ]]; then
+        _env_add "OPENAI_API_KEY" "$OPENAI_KEY"
+    fi
+elif [[ "$EMBEDDING_MODEL" == "gemini" ]]; then
+    _env_add "ZOTERO_EMBEDDING_MODEL" "gemini"
+    _env_add "GEMINI_EMBEDDING_MODEL" "gemini-embedding-001"
+    if [[ -n "$GEMINI_KEY" ]]; then
+        _env_add "GEMINI_API_KEY" "$GEMINI_KEY"
+    fi
+fi
+
+# Serialize env pairs as a pipe-delimited string, parsed by the Python block.
+# Using a delimiter avoids shell quoting hazards for keys like API keys.
+ENV_PAIRS=""
+for i in "${!ENV_KEYS[@]}"; do
+    ENV_PAIRS+="${ENV_KEYS[$i]}=${ENV_VALUES[$i]}"$'\n'
+done
 
 if [[ ! -f "$CLAUDE_CONFIG_FILE" ]]; then
     mkdir -p "$(dirname "$CLAUDE_CONFIG_FILE")"
@@ -703,13 +979,20 @@ if [[ -f "$CLAUDE_CONFIG_FILE" ]]; then
     fi
 fi
 
-# Safely merge JSON config
-if ! python3 << PYEOF
+# Safely merge JSON config. Pass env pairs via an environment variable so we
+# don't have to shell-escape values (API keys, etc.) into the heredoc.
+if ! ZMCP_ENV_PAIRS="$ENV_PAIRS" ZMCP_CONFIG_PATH="$CLAUDE_CONFIG_FILE" ZMCP_BIN_PATH="$ZOTERO_MCP_PATH" python3 << 'PYEOF'
 import json, os
 
-config_path = "$CLAUDE_CONFIG_FILE"
-zotero_mcp_path = "$ZOTERO_MCP_PATH"
-env_dict = $ENV_DICT
+config_path = os.environ["ZMCP_CONFIG_PATH"]
+zotero_mcp_path = os.environ["ZMCP_BIN_PATH"]
+
+env_dict = {}
+for line in os.environ.get("ZMCP_ENV_PAIRS", "").splitlines():
+    if not line:
+        continue
+    k, _, v = line.partition("=")
+    env_dict[k] = v
 
 config = {}
 if os.path.exists(config_path):
@@ -739,7 +1022,11 @@ then
     echo ""
     echo "     \"zotero\": {"
     echo "       \"command\": \"$ZOTERO_MCP_PATH\","
-    echo "       \"env\": $ENV_DICT"
+    echo "       \"env\": {"
+    for i in "${!ENV_KEYS[@]}"; do
+        echo "         \"${ENV_KEYS[$i]}\": \"${ENV_VALUES[$i]}\"$([[ $i -lt $((${#ENV_KEYS[@]} - 1)) ]] && echo ',')"
+    done
+    echo "       }"
     echo "     }"
     echo ""
 fi
@@ -757,12 +1044,19 @@ if [[ "$ENABLE_SEMANTIC_SEARCH" == "yes" ]]; then
     SEMANTIC_CONFIG_FILE="$SEMANTIC_CONFIG_DIR/config.json"
     mkdir -p "$SEMANTIC_CONFIG_DIR"
 
-    if ! python3 << PYEOF
+    if ! ZMCP_SEM_CONFIG="$SEMANTIC_CONFIG_FILE" \
+         ZMCP_PDF_INDEX="$PDF_INDEX_PAGES" \
+         ZMCP_PDF_DISPLAY="$PDF_DISPLAY_PAGES" \
+         ZMCP_EMBEDDING="$EMBEDDING_MODEL" \
+         ZMCP_OPENAI_VARIANT="$OPENAI_VARIANT" \
+         python3 << 'PYEOF'
 import json, os
 
-config_path = "$SEMANTIC_CONFIG_FILE"
-pdf_index_pages = int("$PDF_INDEX_PAGES")
-pdf_display_pages = int("$PDF_DISPLAY_PAGES")
+config_path = os.environ["ZMCP_SEM_CONFIG"]
+pdf_index_pages = int(os.environ["ZMCP_PDF_INDEX"])
+pdf_display_pages = int(os.environ["ZMCP_PDF_DISPLAY"])
+embedding = os.environ.get("ZMCP_EMBEDDING", "local")
+openai_variant = os.environ.get("ZMCP_OPENAI_VARIANT", "small")
 
 config = {}
 if os.path.exists(config_path):
@@ -781,6 +1075,23 @@ ext = ss.setdefault('extraction', {})
 ext['pdf_max_pages'] = pdf_index_pages
 ext['fulltext_display_max_pages'] = pdf_display_pages
 
+# Embedding choice — mirror lib/installer_core.py Step 4 write.
+# Upstream expects "default"/"openai"/"gemini" at the root of semantic_search,
+# and for non-default variants an embedding_config.model_name.
+if embedding == "openai":
+    ss['embedding_model'] = 'openai'
+    ss['embedding_config'] = {
+        'model_name': ('text-embedding-3-large'
+                       if openai_variant == 'large'
+                       else 'text-embedding-3-small')
+    }
+elif embedding == "gemini":
+    ss['embedding_model'] = 'gemini'
+    ss['embedding_config'] = {'model_name': 'gemini-embedding-001'}
+else:
+    ss['embedding_model'] = 'default'
+    ss.pop('embedding_config', None)
+
 with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
     f.write('\n')
@@ -790,10 +1101,22 @@ PYEOF
     fi
 
     success "Auto-update on startup: enabled"
-    success "Full-text indexing: enabled"
+    if [[ "$INDEX_DEPTH" == "full" ]]; then
+        success "Full-text indexing: enabled"
+    else
+        success "Full-text indexing: disabled (metadata only)"
+    fi
     success "PDF indexing limit: $PDF_INDEX_PAGES pages"
     echo ""
     success "Display limit: $PDF_DISPLAY_PAGES pages"
+    case "$EMBEDDING_MODEL" in
+        openai)
+            success "Embedding backend: OpenAI ($OPENAI_VARIANT)" ;;
+        gemini)
+            success "Embedding backend: Gemini" ;;
+        *)
+            success "Embedding backend: local (default)" ;;
+    esac
 fi
 
 # ============================================================================
@@ -875,27 +1198,54 @@ if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
 
         if [[ "$BUILD_SEMANTIC_DB" == "yes" ]]; then
             echo ""
-            info "Building semantic search database with full-text indexing..."
-            info "This indexes the content of your papers for better search."
+            if [[ "$INDEX_DEPTH" == "full" ]]; then
+                info "Building semantic search database with full-text indexing..."
+                info "This indexes the content of your papers for better search."
+            else
+                info "Building semantic search database (metadata only)..."
+                info "Use --index-depth=full to also index PDF contents."
+            fi
             echo ""
             info "You can start using the MCP in Claude Desktop while this runs."
             info "All tools work immediately — semantic search results will"
             info "improve once the build completes."
             echo ""
 
-            if ZOTERO_LOCAL=true "$ZOTERO_MCP_PATH" update-db --fulltext 2>&1; then
+            # Build the update-db command. Mirror installer_core.py line 738:
+            # only pass --fulltext when index-depth is full.
+            declare -a DB_CMD=("$ZOTERO_MCP_PATH" "update-db")
+            if [[ "$INDEX_DEPTH" == "full" ]]; then
+                DB_CMD+=("--fulltext")
+            fi
+
+            # Export embedding env vars into the subprocess so indexing uses
+            # the chosen backend immediately (mirror lines 715-723 of installer_core.py).
+            # Runtime Claude calls read these from claude_desktop_config.json;
+            # this subprocess doesn't, so we pass them through explicitly.
+            DB_ENV=(ZOTERO_LOCAL=true)
+            for i in "${!ENV_KEYS[@]}"; do
+                k="${ENV_KEYS[$i]}"
+                case "$k" in
+                    ZOTERO_EMBEDDING_MODEL|OPENAI_API_KEY|OPENAI_EMBEDDING_MODEL|GEMINI_API_KEY|GEMINI_EMBEDDING_MODEL)
+                        DB_ENV+=("$k=${ENV_VALUES[$i]}") ;;
+                esac
+            done
+
+            if env "${DB_ENV[@]}" "${DB_CMD[@]}" 2>&1; then
                 echo ""
                 success "Semantic search database built"
                 pause 0.5
             else
                 echo ""
                 warn "Database build had issues."
+                REBUILD_CMD="$ZOTERO_MCP_PATH update-db"
+                [[ "$INDEX_DEPTH" == "full" ]] && REBUILD_CMD="$REBUILD_CMD --fulltext"
                 if [[ -d "$DB_PATH" ]]; then
                     echo "   A partial database may exist. To rebuild from scratch:"
-                    echo "   $ZOTERO_MCP_PATH update-db --fulltext --force-rebuild"
+                    echo "   $REBUILD_CMD --force-rebuild"
                 else
                     echo "   To try again later:"
-                    echo "   $ZOTERO_MCP_PATH update-db --fulltext"
+                    echo "   $REBUILD_CMD"
                 fi
             fi
         fi
