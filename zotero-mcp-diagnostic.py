@@ -62,15 +62,37 @@ def _enriched_path():
     return path
 
 
+def _uv_tools_base():
+    """Return the uv tools directory for the zotero-mcp-server install.
+
+    uv stores its tool venvs under different roots per platform:
+      - macOS/Linux: ~/.local/share/uv/tools/
+      - Windows:     %APPDATA%\\uv\\tools\\
+                     (typically C:\\Users\\<user>\\AppData\\Roaming\\uv\\tools\\)
+    """
+    if IS_WIN:
+        appdata = os.environ.get("APPDATA", os.path.expanduser("~"))
+        return os.path.join(appdata, "uv", "tools", "zotero-mcp-server")
+    return os.path.expanduser("~/.local/share/uv/tools/zotero-mcp-server")
+
+
 def _uv_venv_python():
     """Find uv's venv Python for the zotero-mcp-server tool."""
-    base = os.path.expanduser("~/.local/share/uv/tools/zotero-mcp-server")
+    base = _uv_tools_base()
+    bin_dir = "Scripts" if IS_WIN else "bin"
+    # Windows uses python.exe; Mac/Linux use versioned symlinks (python3.12 etc.)
+    if IS_WIN:
+        for pyname in ["python.exe", "python3.exe"]:
+            candidate = os.path.join(base, bin_dir, pyname)
+            if os.path.isfile(candidate):
+                return candidate
+        return None
     for pyver in ["python3.13", "python3.12", "python3.11", "python3.10", "python3"]:
-        candidate = os.path.join(base, "bin" if not IS_WIN else "Scripts", pyver)
+        candidate = os.path.join(base, bin_dir, pyver)
         if os.path.isfile(candidate):
             return candidate
     # Fallback: just look for python3 in the venv
-    candidate = os.path.join(base, "bin" if not IS_WIN else "Scripts", "python3")
+    candidate = os.path.join(base, bin_dir, "python3")
     if os.path.isfile(candidate):
         return candidate
     return None
@@ -163,9 +185,10 @@ def check_uv():
 
 def check_zotero_mcp():
     """Check zotero-mcp binary."""
+    binary_name = "zotero-mcp.exe" if IS_WIN else "zotero-mcp"
     path = shutil.which("zotero-mcp")
     if not path:
-        p = os.path.expanduser("~/.local/bin/zotero-mcp")
+        p = os.path.expanduser(f"~/.local/bin/{binary_name}")
         if os.path.isfile(p):
             path = p
     if not path:
@@ -240,8 +263,7 @@ def check_dependencies():
                 missing.append(mod)
 
     # Check uv-receipt.toml for extras
-    receipt_path = os.path.expanduser(
-        "~/.local/share/uv/tools/zotero-mcp-server/uv-receipt.toml")
+    receipt_path = os.path.join(_uv_tools_base(), "uv-receipt.toml")
     extras = "unknown"
     if os.path.isfile(receipt_path):
         try:
@@ -564,7 +586,8 @@ def check_permissions():
     """Check file permissions on key paths."""
     paths = {}
 
-    mcp_path = shutil.which("zotero-mcp") or os.path.expanduser("~/.local/bin/zotero-mcp")
+    mcp_fallback = "~/.local/bin/zotero-mcp.exe" if IS_WIN else "~/.local/bin/zotero-mcp"
+    mcp_path = shutil.which("zotero-mcp") or os.path.expanduser(mcp_fallback)
     if os.path.isfile(mcp_path):
         paths["mcp_binary"] = {"path": mcp_path, "executable": os.access(mcp_path, os.X_OK)}
 
@@ -601,10 +624,11 @@ def check_permissions():
 
 def check_conflicting_installs():
     """Check for multiple zotero-mcp binaries in PATH."""
+    binary_name = "zotero-mcp.exe" if IS_WIN else "zotero-mcp"
     found = []
     seen = set()
     for directory in _enriched_path().split(os.pathsep):
-        candidate = os.path.join(directory, "zotero-mcp")
+        candidate = os.path.join(directory, binary_name)
         if os.path.isfile(candidate) and candidate not in seen:
             found.append(candidate)
             seen.add(candidate)
@@ -613,7 +637,7 @@ def check_conflicting_installs():
     if len(found) > 1:
         return "conflicts", "WARN", f"Multiple copies found: {', '.join(found)}", info
     elif len(found) == 0:
-        return "conflicts", "FAIL", "No zotero-mcp found in PATH", info
+        return "conflicts", "FAIL", f"No {binary_name} found in PATH", info
     return "conflicts", "OK", f"Single install at {found[0]}", info
 
 

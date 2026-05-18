@@ -843,20 +843,20 @@ else
 fi
 
 # First attempt
-uv tool install --force --reinstall "$INSTALL_PKG" > /dev/null 2>&1 &
+uv tool install --python 3.12 --force --reinstall "$INSTALL_PKG" > /dev/null 2>&1 &
 spin $! "Installing Zotero MCP server..."
 if ! wait $!; then
     # Second attempt: clear cache and retry (show output this time)
     warn "First install attempt failed. Retrying..."
     uv cache clean > /dev/null 2>&1 || true
     echo ""
-    if ! uv tool install --force --reinstall "$INSTALL_PKG" 2>&1; then
+    if ! uv tool install --python 3.12 --force --reinstall "$INSTALL_PKG" 2>&1; then
         echo ""
         fail "Server installation failed."
         echo ""
         echo "   Please try running the following command in your Terminal:"
         echo ""
-        echo "     uv tool install --force $INSTALL_PKG"
+        echo "     uv tool install --python 3.12 --force $INSTALL_PKG"
         echo ""
         echo "   Once that completes, run this installer script again"
         echo "   to finish the setup."
@@ -902,7 +902,7 @@ if [[ -z "$ZOTERO_MCP_PATH" ]]; then
     echo "     uv tool list"
     echo ""
     echo "   Or try reinstalling manually:"
-    echo "     uv tool install --force zotero-mcp-server[all]"
+    echo "     uv tool install --python 3.12 --force zotero-mcp-server[all]"
     echo ""
     echo "   Then re-run this script."
     exit 1

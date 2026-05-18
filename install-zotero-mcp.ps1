@@ -71,6 +71,11 @@ param(
 
 $ErrorActionPreference = "Continue"
 
+# Force TLS 1.2 for all .NET web calls. Older Windows boxes (Win10 pre-1903,
+# Server 2016) default to TLS 1.0/1.1, which GitHub and PyPI no longer accept.
+# Use -bor (bitwise OR) so we don't disable TLS 1.3 on systems that have it.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
 # --diagnose: run diagnostics only, no install
 if ($diagnose) {
     $py = Get-Command python3 -ErrorAction SilentlyContinue
@@ -709,9 +714,9 @@ if ($eugene) {
 $installSuccess = $false
 $uvList = try { uv tool list 2>$null } catch { "" }
 if ($uvList -match "zotero-mcp-server") {
-    uv tool install --force --reinstall $InstallPkg 2>$null
+    uv tool install --python 3.12 --force --reinstall $InstallPkg 2>$null
 } else {
-    uv tool install $InstallPkg 2>$null
+    uv tool install --python 3.12 $InstallPkg 2>$null
 }
 
 if ($LASTEXITCODE -eq 0) {
@@ -721,7 +726,7 @@ if ($LASTEXITCODE -eq 0) {
     Warn "First install attempt failed. Retrying..."
     try { uv cache clean 2>$null } catch { }
     Write-Host ""
-    uv tool install --force --reinstall $InstallPkg 2>&1
+    uv tool install --python 3.12 --force --reinstall $InstallPkg 2>&1
     if ($LASTEXITCODE -eq 0) {
         $installSuccess = $true
     }
@@ -733,7 +738,7 @@ if (-not $installSuccess) {
     Write-Host ""
     Write-Host "   Please try running the following command in PowerShell:"
     Write-Host ""
-    Write-Host "     uv tool install --force $InstallPkg"
+    Write-Host "     uv tool install --python 3.12 --force $InstallPkg"
     Write-Host ""
     Write-Host "   Once that completes, run this installer script again"
     Write-Host "   to finish the setup."
@@ -767,7 +772,7 @@ if (-not $ZoteroMcpPath -or -not (Test-Path $ZoteroMcpPath)) {
     Write-Host ""
     Write-Host "   This usually means uv installed it in an unexpected location."
     Write-Host "   Try running: uv tool list"
-    Write-Host "   Or reinstall manually: uv tool install --force $InstallPkg"
+    Write-Host "   Or reinstall manually: uv tool install --python 3.12 --force $InstallPkg"
     exit 1
 }
 
